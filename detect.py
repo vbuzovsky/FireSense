@@ -14,6 +14,10 @@ from utils.general import check_img_size, check_requirements, check_imshow, non_
 from utils.plots import plot_one_box
 from utils.torch_utils import select_device, load_classifier, time_synchronized, TracedModel
 
+# my imports:
+import my_utils.optical_flow
+import queue
+
 
 def detect(save_img=False):
     source, weights, view_img, save_txt, imgsz, trace = opt.source, opt.weights, opt.view_img, opt.save_txt, opt.img_size, not opt.no_trace
@@ -29,6 +33,9 @@ def detect(save_img=False):
     set_logging()
     device = select_device(opt.device)
     half = device.type != 'cpu'  # half precision only supported on CUDA
+
+    # Initialize image buffer
+    IMG_BUFFER = queue.Queue(10)
 
     # Load model
     model = attempt_load(weights, map_location=device)  # load FP32 model
@@ -49,7 +56,7 @@ def detect(save_img=False):
 
     # Set Dataloader
     vid_path, vid_writer = None, None
-    if webcam:
+    if webcam:                          # webcam - also video from youtube etc.
         view_img = check_imshow()
         cudnn.benchmark = True  # set True to speed up constant image size inference
         dataset = LoadStreams(source, img_size=imgsz, stride=stride)
@@ -107,7 +114,19 @@ def detect(save_img=False):
             save_path = str(save_dir / p.name)  # img.jpg
             txt_path = str(save_dir / 'labels' / p.stem) + ('' if dataset.mode == 'image' else f'_{frame}')  # img.txt
             gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
-            if len(det):
+            
+            # fill IMG_BUFFER with frames, even with no detection
+            # if(i==0) in case of multiple detections -> we avoid having 1 frame multiple times in queue
+            if(i==0):
+                IMG_BUFFER.put([im0, len(det)]) # len(det) gives information about how many detection there are
+                # IMG_BUFFER.put([im0, det]) # can also pass 'det' so we can directly use tensors of detections
+
+            # det looks like: (2 detections)
+            # tensor([[4.43483e+02, 1.15858e+02, 4.71866e+02, 1.29325e+02, 5.64296e-01, 1.00000e+00],
+            # [1.63590e+02, 1.66809e+01, 5.55311e+02, 3.16970e+02, 5.19833e-01, 0.00000e+00]])
+
+
+            if len(det): # if there is any detection
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_coords(img.shape[2:], det[:, :4], im0.shape).round()
 
@@ -127,6 +146,12 @@ def detect(save_img=False):
                     if save_img or view_img:  # Add bbox to image
                         label = f'{names[int(cls)]} {conf:.2f}'
                         plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=1)
+
+            print(IMG_BUFFER.qsize())
+
+            # Clear buffer after 
+            if(IMG_BUFFER.full()):
+                IMG_BUFFER.get()
 
             # Print time (inference + NMS)
             print(f'{s}Done. ({(1E3 * (t2 - t1)):.1f}ms) Inference, ({(1E3 * (t3 - t2)):.1f}ms) NMS')
