@@ -147,6 +147,42 @@ def detect(save_img=False):
                         label = f'{names[int(cls)]} {conf:.2f}'
                         plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=1)
 
+                # If there is detection on a frame && IMG_BUFFER is full && IMG_BUFFER has atleast 3 frames with detection
+                # -> then take snapshot of current buffer (ready_for_opt_flow : list) and send it for flow calculation
+                if(IMG_BUFFER.full()):
+                    ready_for_opt_flow = [] # TODO: this however causes buffer to reset after taking snapshop to 0 frames
+                    detections = 0
+
+                    for i in range(IMG_BUFFER.qsize()): # Loops through IMG_BUFFER, ends on same values
+                        current = IMG_BUFFER.get()
+                        ready_for_opt_flow.append(current) # during loop we also create list of duplicate values
+
+                        if(current[-1]): # current is list, first position is frame, second number of detections for that frame
+                            detections = detections + 1
+
+                        IMG_BUFFER.put(current)
+
+                    # Check for >= 3 detections, then take snapshot (save the buffer as png's) and draw flow
+                    if(detections >= 3):
+
+                        # Taking snapshot of current buffer (-> saving frames as png's to folder)
+                        index = 0
+                        while not IMG_BUFFER.empty():
+                            cv2.imwrite(f'./current_buffer_snapshot/{index}.jpg', IMG_BUFFER.get()[0])
+                            index += 1
+
+                        # send current frames to calculating and then drawing function
+                        optical_flow = my_utils.optical_flow.calculate_optical_flow(ready_for_opt_flow) # add 'hsv' as second param for hsv
+                        # print("optical flow: ", optical_flow)
+                        # print("frame to print on: ")
+                        # while True:
+                        #     cv2.imshow("LATEST FRAME", ready_for_opt_flow[-1][0])
+                        #     key = cv2.waitKey(5)
+                        #     if key == ord('q'):
+                        #         break
+                        my_utils.optical_flow.draw_optical_flow(optical_flow, ready_for_opt_flow[-1][0], param='flow')
+
+
             print(IMG_BUFFER.qsize())
 
             # Clear buffer after 
