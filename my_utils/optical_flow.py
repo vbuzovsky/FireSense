@@ -3,7 +3,7 @@ import cv2
 import copy
 
 # private function for 'draw_optical_flow'
-def _draw_flow(img, flow, step=16):
+def _draw_flow(img, flow, step=8):
 
     h, w = img.shape[:2]
     y, x = np.mgrid[step/2:h:step, step/2:w:step].reshape(2,-1).astype(int)
@@ -51,13 +51,14 @@ def calculate_optical_flow(imgs_lst : list):
     # generates 9 flows between 10 frames (1 x 2 x 3 x 4 x 5 x 6 x 7 x 8 x 9 x 10); x = flow calc between frames
     for i in range(len(grayscale_imgs_lst)):
         if not(i+1 == len(grayscale_imgs_lst)):
-            # uncomment to see what grayscale pairs of frames are being used:
-            #print(f'currennt {i}: ', grayscale_imgs_lst[i])
-            #print(f'next {i+1}: ', grayscale_imgs_lst[i+1])
-            optical_flows.append(cv2.calcOpticalFlowFarneback(grayscale_imgs_lst[i], grayscale_imgs_lst[i+1], None, 0.5, 3, 15, 3, 5, 1.2, 0))
+            optical_flows.append(cv2.calcOpticalFlowFarneback(grayscale_imgs_lst[i], grayscale_imgs_lst[i+1], None, 0.5, 3, 7, 3, 5, 1.2, 0))
+
 
     # create deep copy of one of the flows | this gets replaced by sum of all flows, need this to have same data structure
     optical_flow_sum = copy.deepcopy(optical_flows[0])
+
+    # SHOW SHAPE OF ONE OF THE FLOWS
+    # print(optical_flow_sum.shape)
 
     # implementation of naive sum over all calculated optical flows
     for i, flow in enumerate(optical_flows):
@@ -65,13 +66,15 @@ def calculate_optical_flow(imgs_lst : list):
             for x, outer in enumerate(flow):
                 for y, inner in enumerate(outer):
                     optical_flow_sum[x][y] += optical_flows[i][x][y] + optical_flows[i+1][x][y]
+
+    #print("optical_flow_sum: ",optical_flow_sum)
     
-    return optical_flow_sum
+    return optical_flow_sum / len(optical_flows)
 
 # param = 'flow' / 'hsv' print
 def draw_optical_flow(flow, frame, param : str = 'flow'):
     if(param == 'flow'): # Draw flow
-        grayscale_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        grayscale_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) # needed for passing grayscale img to _draw_flow
         while True:
             cv2.imshow("OPTICAL FLOW", _draw_flow(grayscale_frame, flow))
             key = cv2.waitKey(5)
@@ -85,6 +88,12 @@ def draw_optical_flow(flow, frame, param : str = 'flow'):
                 break
         
 
+def save_optical_flow(flow, frame, param='flow', cls : str = "undefined"):
+   grayscale_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) # needed for passing grayscale img to _draw_flow
+   if(param == 'flow'):
+      cv2.imwrite(f'./output/current_buffer_average_bbox_with_flow/{cls}.jpg', _draw_flow(grayscale_frame, flow))
+   else: # draw hsv
+      cv2.imwrite(f'./output/current_buffer_average_bbox_with_flow/{cls}.jpg', _draw_hsv(flow))
 
 
 
