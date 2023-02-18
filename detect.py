@@ -19,6 +19,7 @@ from utils.torch_utils import select_device, load_classifier, time_synchronized,
 import my_utils.optical_flow
 import my_utils.bb_average
 import my_utils.snapshot_clear
+import my_utils.subsample_flow
 import queue
 import matplotlib.pylab as plt
 
@@ -116,7 +117,6 @@ def detect(save_img=False):
             pred = apply_classifier(pred, modelc, img, im0s)
       
         #print('\npred: ', pred)
-
         # pred: (every predition is a tensor, where last value of each row is the class (0 smoke or 1 fire))
         # 1 smoke, 1 fire, Done. (315.9ms) Inference, (0.5ms) NMS
         # pred: [tensor([[3.44141e+02, 2.64356e+02, 3.64211e+02, 2.93777e+02, 3.55650e-01, 1.00000e+00],
@@ -129,7 +129,7 @@ def detect(save_img=False):
 
         # Process detections
         for i, det in enumerate(pred):  
-            if webcam:  # batch_size >= 1
+            if webcam: 
                 p, s, im0, frame = path[i], '%g: ' % i, im0s[i].copy(), dataset.count
             else:
                 p, s, im0, frame = path, '', im0s, getattr(dataset, 'frame', 0)
@@ -150,126 +150,128 @@ def detect(save_img=False):
 
 
             if len(det): # if there is any detection
-                # Rescale boxes from img_size to im0 size
-                det[:, :4] = scale_coords(img.shape[2:], det[:, :4], im0.shape).round()
+               # Rescale boxes from img_size to im0 size
+               det[:, :4] = scale_coords(img.shape[2:], det[:, :4], im0.shape).round()
 
-                # Print results
-                for c in det[:, -1].unique():
-                    n = (det[:, -1] == c).sum()  # detections per class
-                    s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add to string
-
-
-                pixel_size=[]
-                bb_shapes=[]
-                # Write results
-                for *xyxy, conf, cls in reversed(det): # cls is the class (0 smoke or 1 fire)
-                    bounding_boxes_per_image.append([int(xyxy[1]), int(xyxy[3]), int(xyxy[0]), int(xyxy[2])])
-                    
-                    bounding_box = im0[int(xyxy[1]):int(xyxy[3]),int(xyxy[0]):int(xyxy[2])]
-                    shape_of_bb=bounding_box.shape
-                    bb_shapes.append(shape_of_bb)
-                    bb_areas=shape_of_bb[0]*shape_of_bb[1]                    
-                    pixel_size.append(bb_areas)
-                    # xyxy[1] = y1, xyxy[3] = y2, xyxy[0] = x1, xyxy[2] = x2
-                    cropped_image = im0[int(xyxy[1]):int(xyxy[3]),int(xyxy[0]):int(xyxy[2])]
-                    list_of_cropped_detections.append([cropped_image, int(cls)])
-                    if(int(cls)==0):
-                        list_of_coordinates_of_cropped_detections_smoke.append([int(xyxy[1]), int(xyxy[3]), int(xyxy[0]), int(xyxy[2])])
-                    else:
-                        list_of_coordinates_of_cropped_detections_fire.append([int(xyxy[1]), int(xyxy[3]), int(xyxy[0]), int(xyxy[2])])
-
-                    if save_txt:  # Write to file
-                        xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
-                        line = (cls, *xywh, conf) if opt.save_conf else (cls, *xywh)  # label format
-                        with open(txt_path + '.txt', 'a') as f:
-                            f.write(('%g ' * len(line)).rstrip() % line + '\n')
-
-                    if save_img or view_img:  # Add bbox to image
-                        label = f'{names[int(cls)]} {conf:.2f}'
-                        plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=1)
-
-                # If there is detection on a frame && IMG_BUFFER is full && IMG_BUFFER has atleast 3 frames with detection
-                # -> then take snapshot of current buffer (ready_for_opt_flow : list) and send it for flow calculation
-                if(IMG_BUFFER.full()):
-
-                    # MAYBE define detections somewhere upwards and loop through IMG_BUFFER just in case there is enough detection to save process time
-                    # --------------   LOOP THROUGH IMG_BUFFER, END ON SAME VALUES ----------------
-                    ready_for_opt_flow = [] # TODO: this however causes buffer to reset after taking snapshop to 0 frames
-                    detections = 0
-
-                    for i in range(IMG_BUFFER.qsize()): # Loops through IMG_BUFFER, ends on same values | just to fill ready_for_opt_flow list
-                        current = IMG_BUFFER.get()
-                        ready_for_opt_flow.append(current) # during loop we also create list of duplicate values
-
-                        if(current[-1]): # current is list, first position is frame, second number of detections for that frame
-                            detections = detections + 1
-
-                        IMG_BUFFER.put(current)
-                    # -----------------------------------------------------------------------------
-
-                    # Check for >= 5 detections (in case BUFFER is size of 10), then take snapshots of buffer and detections,
-                    # then calculate average bounding box for reach class and draw flow from whole buffer, print it to last frame
-                    if(detections >= math.floor(BUFFER_SIZE - BUFFER_SIZE/2)):
-                        my_utils.snapshot_clear.clear_snapshot("./output/current_detection_snapshot")
-                        my_utils.snapshot_clear.clear_snapshot("./output/current_buffer_average_bbox")
-                        my_utils.snapshot_clear.clear_snapshot("./output/current_buffer_average_bbox_with_flow")
-                        my_utils.snapshot_clear.clear_snapshot("./output/current_buffer_snapshot")
-                        bbox_fire = []
-                        bbox_smoke = []
-
-                        # Taking snapshot of current buffer (-> saving frames as png's to folder)
-                        index = 0
-                        while not IMG_BUFFER.empty(): # empty magazine (IMG_BUFFER)
-                            cv2.imwrite(f'./output/current_buffer_snapshot/{index}.jpg', IMG_BUFFER.get()[0])
-                            index += 1
-
-                        # Taking snapshot of current detections (-> saving frames as png's to folder)
-                        for index, detection in enumerate(list_of_cropped_detections):
-                            if(detection[1] == 0): # 0 is smoke
-                              cv2.imwrite(f'./output/current_detection_snapshot/smoke-{index}.jpg', detection[0])
-                              bbox_smoke.append(detection[0])
-                            else:
-                              cv2.imwrite(f'./output/current_detection_snapshot/fire-{index}.jpg', detection[0])
-                              bbox_fire.append(detection[0])
-                        list_of_cropped_detections = [] # reset list of cropped detections
+               # Print results
+               for c in det[:, -1].unique():
+                  n = (det[:, -1] == c).sum()  # detections per class
+                  s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add to string
 
 
-                        # Calculate average bounding box for each class
-                        # TODO: potencial error, if there is no detection of one class, then average bounding box calculation will crash??
-                        average_bounding_box_smoke = my_utils.bb_average.calculate_average_bbox(list_of_coordinates_of_cropped_detections_smoke)
-                        average_bounding_box_fire = my_utils.bb_average.calculate_average_bbox(list_of_coordinates_of_cropped_detections_fire)
-                        
-                        # Draw average bounding box for each class and save them
-                        average_smoke_detection = my_utils.bb_average.draw_average_bbox(average_bounding_box_smoke, ready_for_opt_flow[-1][0], "smoke")
-                        average_fire_detection = my_utils.bb_average.draw_average_bbox(average_bounding_box_fire, ready_for_opt_flow[-1][0], "fire")
-                        
-                        # calculate full optical flow from all frames 
-                        optical_flow = my_utils.optical_flow.calculate_optical_flow(ready_for_opt_flow) # add 'hsv' as second param for hsv
-                      
-                        # crop full optical flow to just optical flow related to each class
-                        # average_bounding_box_whatever[0] = y1, average_bounding_box_whatever[1] = y2, average_bounding_box_whatever[2] = x1, average_bounding_box_whatever[3] = x2
-                        fire_optical_flow = optical_flow[average_bounding_box_fire[0]:average_bounding_box_fire[1], average_bounding_box_fire[2]:average_bounding_box_fire[3], :]
-                        smoke_optical_flow = optical_flow[average_bounding_box_smoke[0]:average_bounding_box_smoke[1], average_bounding_box_smoke[2]:average_bounding_box_smoke[3], :]
-                        
-                        # some info about optical flow and bboxes
-                        print("average bbox shape: ", average_bounding_box_fire)
-                        print("fire optical flow shape: ", fire_optical_flow.shape)
-                        print("average bbox for fire shape: ", average_bounding_box_fire)
-                        print("ready for opt flow shape: ", ready_for_opt_flow[-1][0].shape)
-                        
-                        # save optical flow for fire
-                        my_utils.optical_flow.save_optical_flow(fire_optical_flow, average_fire_detection, "flow" , "fire")
-                        my_utils.optical_flow.save_optical_flow(smoke_optical_flow, average_smoke_detection, "flow" , "smoke")
+               pixel_size=[]
+               bb_shapes=[]
+               # Write results
+               for *xyxy, conf, cls in reversed(det): # cls is the class (0 smoke or 1 fire)
+                  bounding_boxes_per_image.append([int(xyxy[1]), int(xyxy[3]), int(xyxy[0]), int(xyxy[2])])
+                  
+                  bounding_box = im0[int(xyxy[1]):int(xyxy[3]),int(xyxy[0]):int(xyxy[2])]
+                  shape_of_bb=bounding_box.shape
+                  bb_shapes.append(shape_of_bb)
+                  bb_areas=shape_of_bb[0]*shape_of_bb[1]                    
+                  pixel_size.append(bb_areas)
+                  # xyxy[1] = y1, xyxy[3] = y2, xyxy[0] = x1, xyxy[2] = x2
+                  cropped_image = im0[int(xyxy[1]):int(xyxy[3]),int(xyxy[0]):int(xyxy[2])]
+                  list_of_cropped_detections.append([cropped_image, int(cls)])
+                  if(int(cls)==0):
+                     list_of_coordinates_of_cropped_detections_smoke.append([int(xyxy[1]), int(xyxy[3]), int(xyxy[0]), int(xyxy[2])])
+                  else:
+                     list_of_coordinates_of_cropped_detections_fire.append([int(xyxy[1]), int(xyxy[3]), int(xyxy[0]), int(xyxy[2])])
 
-                        # draw optical flow for whole images
-                        my_utils.optical_flow.draw_optical_flow(optical_flow, ready_for_opt_flow[-1][0], param='flow')
+                  if save_txt:  # Write to file
+                     xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
+                     line = (cls, *xywh, conf) if opt.save_conf else (cls, *xywh)  # label format
+                     with open(txt_path + '.txt', 'a') as f:
+                           f.write(('%g ' * len(line)).rstrip() % line + '\n')
 
+                  if save_img or view_img:  # Add bbox to image
+                     label = f'{names[int(cls)]} {conf:.2f}'
+                     plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=1)
+
+               # If there is detection on a frame && IMG_BUFFER is full && IMG_BUFFER has atleast 3 frames with detection
+               # -> then take snapshot of current buffer (ready_for_opt_flow : list) and send it for flow calculation
             
+            if(IMG_BUFFER.full()):
+               # MAYBE define detections somewhere upwards and loop through IMG_BUFFER just in case there is enough detection to save process time
+               # --------------   LOOP THROUGH IMG_BUFFER, END ON SAME VALUES ----------------
+               ready_for_opt_flow = [] # TODO: this however causes buffer to reset after taking snapshop to 0 frames
+               frames_with_detection = 0
+
+               for i in range(IMG_BUFFER.qsize()): # Loops through IMG_BUFFER, ends on same values | just to fill ready_for_opt_flow list
+                  current = IMG_BUFFER.get()
+                  ready_for_opt_flow.append(current) # during loop we also create list of duplicate values
+
+                  if(current[-1]): # current is list, first position is frame, second number of detections for that frame
+                     frames_with_detection = frames_with_detection + 1
+
+                  IMG_BUFFER.put(current)
+               # -----------------------------------------------------------------------------
+
+               # Check for >= 5 detections (in case BUFFER is size of 10), then take snapshots of buffer and detections,
+               # then calculate average bounding box for reach class and draw flow from whole buffer, print it to last frame
+               if(frames_with_detection >= math.floor(BUFFER_SIZE - BUFFER_SIZE/2)):
+                  my_utils.snapshot_clear.clear_snapshot("./output/current_detection_snapshot")
+                  my_utils.snapshot_clear.clear_snapshot("./output/current_buffer_average_bbox")
+                  my_utils.snapshot_clear.clear_snapshot("./output/current_buffer_average_bbox_with_flow")
+                  my_utils.snapshot_clear.clear_snapshot("./output/current_buffer_snapshot")
+                  bbox_fire = []
+                  bbox_smoke = []
+
+                  # Taking snapshot of current buffer (-> saving frames as png's to folder)
+                  index = 0
+                  while not IMG_BUFFER.empty(): # empty magazine (IMG_BUFFER)
+                        cv2.imwrite(f'./output/current_buffer_snapshot/{index}.jpg', IMG_BUFFER.get()[0])
+                        index += 1
+
+                  # Taking snapshot of current detections (-> saving frames as png's to folder)
+                  for index, detection in enumerate(list_of_cropped_detections):
+                     if(detection[1] == 0): # 0 is smoke
+                        cv2.imwrite(f'./output/current_detection_snapshot/smoke-{index}.jpg', detection[0])
+                        bbox_smoke.append(detection[0])
+                     else:
+                        cv2.imwrite(f'./output/current_detection_snapshot/fire-{index}.jpg', detection[0])
+                        bbox_fire.append(detection[0])
+                  list_of_cropped_detections = [] # reset list of cropped detections
+
+                  optical_flow = my_utils.optical_flow.calculate_optical_flow(ready_for_opt_flow) # add 'hsv' as second param for hsv
+                  
+                  if(bbox_fire):
+                     average_bounding_box_fire = my_utils.bb_average.calculate_average_bbox(list_of_coordinates_of_cropped_detections_fire)
+                     average_fire_detection = my_utils.bb_average.draw_average_bbox(average_bounding_box_fire, ready_for_opt_flow[-1][0], "fire")
+                     fire_optical_flow = optical_flow[average_bounding_box_fire[0]:average_bounding_box_fire[1], average_bounding_box_fire[2]:average_bounding_box_fire[3], :]
+                     fire_subsampled_flow = my_utils.subsample_flow.subsample(fire_optical_flow)
+                     my_utils.optical_flow.save_optical_flow(fire_optical_flow, average_fire_detection, "flow" , "fire")
+                     print("\nsubsampled fire flow shape: ", fire_subsampled_flow.shape)
+                     print("\n\nfire flow: \n", fire_optical_flow)
+
+                  if(bbox_smoke):   
+                     average_bounding_box_smoke = my_utils.bb_average.calculate_average_bbox(list_of_coordinates_of_cropped_detections_smoke)
+                     average_smoke_detection = my_utils.bb_average.draw_average_bbox(average_bounding_box_smoke, ready_for_opt_flow[-1][0], "smoke")
+                     smoke_optical_flow = optical_flow[average_bounding_box_smoke[0]:average_bounding_box_smoke[1], average_bounding_box_smoke[2]:average_bounding_box_smoke[3], :]
+                     smoke_subsampled_flow = my_utils.subsample_flow.subsample(smoke_optical_flow)
+                     my_utils.optical_flow.save_optical_flow(smoke_optical_flow, average_smoke_detection, "flow" , "smoke")
+                     print("\nsubsampled smoke flow shape: ", smoke_subsampled_flow.shape)
+                     print("\n\nsmoke flow: \n", smoke_optical_flow)
+                  
+                  # some info about optical flow and bboxes
+                  # -------------------------------------
+                  # print("average bbox shape: ", average_bounding_box_fire)
+                  # print("fire optical flow shape: ", fire_optical_flow.shape)
+                  # print("average bbox for fire shape: ", average_bounding_box_fire)
+                  # print("ready for opt flow shape: ", ready_for_opt_flow[-1][0].shape)
+                  # -------------------------------------
+
+                  my_utils.optical_flow.draw_optical_flow(optical_flow, ready_for_opt_flow[-1][0], param='flow')
+
+
             print("buffer size: ",IMG_BUFFER.qsize())
 
-            # Clear buffer after ... Does this even get called???
+            # Pop last frame from buffer when overflowing - also check for detection in that frame and pop it from list of detections
+            # to not be part of the next average bounding box calculation after buffer is full and with >= xyz detections
             if(IMG_BUFFER.full()):
-                IMG_BUFFER.get()
+               dropped_frame = IMG_BUFFER.get()
+               if(dropped_frame[-1]):
+                  list_of_cropped_detections.pop(0)
 
             # Print time (inference + NMS)
             print(f'{s}Done. ({(1E3 * (t2 - t1)):.1f}ms) Inference, ({(1E3 * (t3 - t2)):.1f}ms) NMS')
