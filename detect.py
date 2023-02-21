@@ -20,6 +20,7 @@ import my_utils.optical_flow
 import my_utils.bb_average
 import my_utils.snapshot_clear
 import my_utils.subsample_flow
+import my_utils.file_manager
 import queue
 import matplotlib.pylab as plt
 
@@ -41,6 +42,7 @@ def detect(save_img=False):
     # Initialize image buffer
     BUFFER_SIZE = 10
     IMG_BUFFER = queue.Queue(BUFFER_SIZE)
+    OPT_FLOW_COUNTER = 0
 
     # Cropped Detections storage
     list_of_cropped_detections = [] # for storing cropped detections
@@ -186,7 +188,7 @@ def detect(save_img=False):
 
                   if save_img or view_img:  # Add bbox to image
                      label = f'{names[int(cls)]} {conf:.2f}'
-                     plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=1)
+                     # plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=1)
 
                # If there is detection on a frame && IMG_BUFFER is full && IMG_BUFFER has atleast 3 frames with detection
                # -> then take snapshot of current buffer (ready_for_opt_flow : list) and send it for flow calculation
@@ -234,15 +236,18 @@ def detect(save_img=False):
                   list_of_cropped_detections = [] # reset list of cropped detections
 
                   optical_flow = my_utils.optical_flow.calculate_optical_flow(ready_for_opt_flow) # add 'hsv' as second param for hsv
-                  
+                  OPT_FLOW_COUNTER = OPT_FLOW_COUNTER + 1
+
                   if(bbox_fire):
                      average_bounding_box_fire = my_utils.bb_average.calculate_average_bbox(list_of_coordinates_of_cropped_detections_fire)
                      average_fire_detection = my_utils.bb_average.draw_average_bbox(average_bounding_box_fire, ready_for_opt_flow[-1][0], "fire")
                      fire_optical_flow = optical_flow[average_bounding_box_fire[0]:average_bounding_box_fire[1], average_bounding_box_fire[2]:average_bounding_box_fire[3], :]
                      fire_subsampled_flow = my_utils.subsample_flow.subsample(fire_optical_flow)
                      my_utils.optical_flow.save_optical_flow(fire_optical_flow, average_fire_detection, "flow" , "fire")
-                     print("\nsubsampled fire flow shape: ", fire_subsampled_flow.shape)
-                     print("\n\nfire flow: \n", fire_optical_flow)
+                     # print("\nsubsampled fire flow shape: ", fire_subsampled_flow.shape)
+                     # print("\n\nfire flow: \n", fire_optical_flow)
+                     my_utils.file_manager.save_optical_flow(fire_subsampled_flow, f"./output_flow/fire/fire_{source[-9:-4]}_{OPT_FLOW_COUNTER}")
+                     
 
                   if(bbox_smoke):   
                      average_bounding_box_smoke = my_utils.bb_average.calculate_average_bbox(list_of_coordinates_of_cropped_detections_smoke)
@@ -250,8 +255,11 @@ def detect(save_img=False):
                      smoke_optical_flow = optical_flow[average_bounding_box_smoke[0]:average_bounding_box_smoke[1], average_bounding_box_smoke[2]:average_bounding_box_smoke[3], :]
                      smoke_subsampled_flow = my_utils.subsample_flow.subsample(smoke_optical_flow)
                      my_utils.optical_flow.save_optical_flow(smoke_optical_flow, average_smoke_detection, "flow" , "smoke")
-                     print("\nsubsampled smoke flow shape: ", smoke_subsampled_flow.shape)
-                     print("\n\nsmoke flow: \n", smoke_optical_flow)
+                     # print("\nsubsampled smoke flow shape: ", smoke_subsampled_flow.shape)
+                     # print("\n\nsmoke flow: \n", smoke_optical_flow)
+                     my_utils.file_manager.save_optical_flow(smoke_optical_flow, f"./output_flow/smoke/smoke_{source[-9:-4]}_{OPT_FLOW_COUNTER}")
+
+                  
                   
                   # some info about optical flow and bboxes
                   # -------------------------------------
@@ -261,7 +269,8 @@ def detect(save_img=False):
                   # print("ready for opt flow shape: ", ready_for_opt_flow[-1][0].shape)
                   # -------------------------------------
 
-                  my_utils.optical_flow.draw_optical_flow(optical_flow, ready_for_opt_flow[-1][0], param='flow')
+                  # my_utils.optical_flow.draw_optical_flow(optical_flow, ready_for_opt_flow[-1][0], param='flow')
+                  
 
 
             print("buffer size: ",IMG_BUFFER.qsize())
