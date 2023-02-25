@@ -245,16 +245,24 @@ def detect(save_img=False):
                   print("Number of detection in buffer: ", len(list_of_cropped_detections))
                   list_of_cropped_detections = [] # reset list of cropped detections
 
-                  optical_flow = my_utils.optical_flow.calculate_optical_flow(ready_for_opt_flow) # add 'hsv' as second param for hsv
+                  # optical_flow = my_utils.optical_flow.calculate_optical_flow(ready_for_opt_flow) # add 'hsv' as second param for hsv
                   # counter only needed when saving flows for creating flow dataset
                   # OPT_FLOW_COUNTER = OPT_FLOW_COUNTER + 1
 
+                  
                
                   if(bbox_fire):
                      average_bounding_box_fire = my_utils.bb_average.calculate_average_bbox(list_of_coordinates_of_cropped_detections_fire)
                      print("\nNumber of fire detections: ", len(list_of_coordinates_of_cropped_detections_fire))
                      average_fire_detection = my_utils.bb_average.draw_average_bbox(average_bounding_box_fire, ready_for_opt_flow[-1][0], "fire")
-                     fire_optical_flow = optical_flow[average_bounding_box_fire[0]:average_bounding_box_fire[1], average_bounding_box_fire[2]:average_bounding_box_fire[3], :]
+                     
+                     cropped_frames_for_opt_flow = []
+                     for frame in ready_for_opt_flow:
+                        cropped_frames_for_opt_flow.append([frame[0][average_bounding_box_fire[0]:average_bounding_box_fire[1], average_bounding_box_fire[2]:average_bounding_box_fire[3], :], frame[1], frame[2]])
+                     fire_optical_flow = my_utils.optical_flow.calculate_optical_flow(cropped_frames_for_opt_flow)
+
+
+                     #fire_optical_flow = optical_flow[average_bounding_box_fire[0]:average_bounding_box_fire[1], average_bounding_box_fire[2]:average_bounding_box_fire[3], :]
                      fire_subsampled_flow = my_utils.subsample_flow.subsample(fire_optical_flow)
                      my_utils.optical_flow.save_optical_flow(fire_optical_flow, average_fire_detection, "flow" , "fire")
                      # my_utils.file_manager.save_optical_flow(fire_subsampled_flow, f"./output_flow/fire/fire_{source[-9:-4]}_{OPT_FLOW_COUNTER}")
@@ -267,13 +275,22 @@ def detect(save_img=False):
                      average_bounding_box_smoke = my_utils.bb_average.calculate_average_bbox(list_of_coordinates_of_cropped_detections_smoke)
                      print("\nNumber of smoke detections: ", len(list_of_coordinates_of_cropped_detections_smoke))
                      average_smoke_detection = my_utils.bb_average.draw_average_bbox(average_bounding_box_smoke, ready_for_opt_flow[-1][0], "smoke")
-                     smoke_optical_flow = optical_flow[average_bounding_box_smoke[0]:average_bounding_box_smoke[1], average_bounding_box_smoke[2]:average_bounding_box_smoke[3], :]
+                     
+                     
+                     cropped_frames_for_opt_flow = []
+                     for frame in ready_for_opt_flow:
+                        cropped_frames_for_opt_flow.append([frame[0][average_bounding_box_smoke[0]:average_bounding_box_smoke[1], average_bounding_box_smoke[2]:average_bounding_box_smoke[3], :], frame[1], frame[2]])
+                     smoke_optical_flow = my_utils.optical_flow.calculate_optical_flow(cropped_frames_for_opt_flow)
+
+
+                     #smoke_optical_flow = optical_flow[average_bounding_box_smoke[0]:average_bounding_box_smoke[1], average_bounding_box_smoke[2]:average_bounding_box_smoke[3], :]
                      smoke_subsampled_flow = my_utils.subsample_flow.subsample(smoke_optical_flow)
                      my_utils.optical_flow.save_optical_flow(smoke_optical_flow, average_smoke_detection, "flow" , "smoke")
                      # my_utils.file_manager.save_optical_flow(smoke_subsampled_flow, f"./output_flow/smoke/smoke_{source[-9:-4]}_{OPT_FLOW_COUNTER}")
                      SVM_prediction = SVM.main.pred(SVM_model, smoke_subsampled_flow)
                      print("SVM classifier prediction for smoke:", bool(int(SVM_prediction)), "-- (with {:.1f}% accuracy)".format(float(SVM_accuracy) * 100))
                      print("Average YOLOv7 confidence for smoke: %.2f" % float(sum(list_of_smoke_confidence)/len(list_of_smoke_confidence)))
+                     # my_utils.optical_flow.draw_optical_flow(smoke_optical_flow, cropped_frames_for_opt_flow[-1][0], param='flow')
                   
                   print("--------- END BUFFER OUTPUT ---------")
                   
@@ -285,7 +302,7 @@ def detect(save_img=False):
                   # print("ready for opt flow shape: ", ready_for_opt_flow[-1][0].shape)
                   # -------------------------------------
 
-                  my_utils.optical_flow.draw_optical_flow(optical_flow, ready_for_opt_flow[-1][0], param='flow')
+                  
                   
 
 
