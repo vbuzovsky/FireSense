@@ -1,6 +1,7 @@
 import numpy as np
 import os
 
+
 def load_optical_flow(path):
     flow = np.load(path, allow_pickle=True, fix_imports=True)
     return flow
@@ -43,9 +44,10 @@ def shuffle_dataset(data, labels):
 if __name__ == '__main__':
    raw_data, raw_labels = load_flow_dataset()
    data, labels = shuffle_dataset(raw_data, raw_labels)
+   for item in raw_data:
+      print("len of item: ", len(item))
+   print("-----")
    print("len data: ", len(data))
    print("len labels: ", len(labels))
-   print("data: ", data[:50])
-   print("labels: ", labels[:50])
 
    

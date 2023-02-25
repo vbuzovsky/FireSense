@@ -257,7 +257,7 @@ def detect(save_img=False):
                      my_utils.optical_flow.save_optical_flow(smoke_optical_flow, average_smoke_detection, "flow" , "smoke")
                      # print("\nsubsampled smoke flow shape: ", smoke_subsampled_flow.shape)
                      # print("\n\nsmoke flow: \n", smoke_optical_flow)
-                     my_utils.file_manager.save_optical_flow(smoke_optical_flow, f"./output_flow/smoke/smoke_{source[-9:-4]}_{OPT_FLOW_COUNTER}")
+                     my_utils.file_manager.save_optical_flow(smoke_subsampled_flow, f"./output_flow/smoke/smoke_{source[-9:-4]}_{OPT_FLOW_COUNTER}")
 
                   
                   
