@@ -261,7 +261,6 @@ def detect(save_img=False):
                         cropped_frames_for_opt_flow.append([frame[0][average_bounding_box_fire[0]:average_bounding_box_fire[1], average_bounding_box_fire[2]:average_bounding_box_fire[3], :], frame[1], frame[2]])
                      fire_optical_flow = my_utils.optical_flow.calculate_optical_flow(cropped_frames_for_opt_flow)
 
-
                      #fire_optical_flow = optical_flow[average_bounding_box_fire[0]:average_bounding_box_fire[1], average_bounding_box_fire[2]:average_bounding_box_fire[3], :]
                      fire_subsampled_flow = my_utils.subsample_flow.subsample(fire_optical_flow)
                      my_utils.optical_flow.save_optical_flow(fire_optical_flow, average_fire_detection, "flow" , "fire")
@@ -275,12 +274,10 @@ def detect(save_img=False):
                      average_bounding_box_smoke = my_utils.bb_average.calculate_average_bbox(list_of_coordinates_of_cropped_detections_smoke)
                      average_smoke_detection = my_utils.bb_average.draw_average_bbox(average_bounding_box_smoke, ready_for_opt_flow[-1][0], "smoke")
                      
-                     
                      cropped_frames_for_opt_flow = []
                      for frame in ready_for_opt_flow:
                         cropped_frames_for_opt_flow.append([frame[0][average_bounding_box_smoke[0]:average_bounding_box_smoke[1], average_bounding_box_smoke[2]:average_bounding_box_smoke[3], :], frame[1], frame[2]])
                      smoke_optical_flow = my_utils.optical_flow.calculate_optical_flow(cropped_frames_for_opt_flow)
-
 
                      #smoke_optical_flow = optical_flow[average_bounding_box_smoke[0]:average_bounding_box_smoke[1], average_bounding_box_smoke[2]:average_bounding_box_smoke[3], :]
                      smoke_subsampled_flow = my_utils.subsample_flow.subsample(smoke_optical_flow)
