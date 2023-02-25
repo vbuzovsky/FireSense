@@ -7,9 +7,7 @@ def subsample(flow):
    x = flow.shape[0]
    y = flow.shape[1]
 
-   print("x: ", x)
-   print("y: ", y)
-
+   # for flows that are smaller than 20x20x2
    if(x < 20):
       x = 20
    if(y < 20):
@@ -19,9 +17,6 @@ def subsample(flow):
    for row in subsampled_rows:
       subsampled_points = row[0::math.floor(y/20)]
       subsampled_flow.append(subsampled_points)
-
-   # print("subsampled_flow: ", np.array(subsampled_flow).shape)
-   # print("subsampled_flow: ", np.array(subsampled_flow))
 
    return np.array(subsampled_flow)[:20, :20, :]
       

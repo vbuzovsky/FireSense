@@ -20,7 +20,6 @@ def calculate_average_bbox(bboxes : list):
 
        
 def draw_average_bbox(bbox : list, img, cls):
-   print("IT GETS HERE WITH CLASS: ", cls)
    cropped_img_with_average_bounding_box = img[bbox[0]:bbox[1],bbox[2]:bbox[3]]
    cv2.imwrite(f'./output/current_buffer_average_bbox/{cls}.jpg', cropped_img_with_average_bounding_box)
    return cropped_img_with_average_bounding_box
