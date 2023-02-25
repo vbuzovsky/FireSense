@@ -243,17 +243,17 @@ def detect(save_img=False):
                         bbox_fire.append(detection[0])
 
                   print("Number of detection in buffer: ", len(list_of_cropped_detections))
+                  print("Number of smoke detections: ", len(bbox_smoke))
+                  print("Number of fire detections: ", len(bbox_fire))
                   list_of_cropped_detections = [] # reset list of cropped detections
 
                   # optical_flow = my_utils.optical_flow.calculate_optical_flow(ready_for_opt_flow) # add 'hsv' as second param for hsv
                   # counter only needed when saving flows for creating flow dataset
                   # OPT_FLOW_COUNTER = OPT_FLOW_COUNTER + 1
 
-                  
                
                   if(bbox_fire):
                      average_bounding_box_fire = my_utils.bb_average.calculate_average_bbox(list_of_coordinates_of_cropped_detections_fire)
-                     print("\nNumber of fire detections: ", len(list_of_coordinates_of_cropped_detections_fire))
                      average_fire_detection = my_utils.bb_average.draw_average_bbox(average_bounding_box_fire, ready_for_opt_flow[-1][0], "fire")
                      
                      cropped_frames_for_opt_flow = []
@@ -273,7 +273,6 @@ def detect(save_img=False):
 
                   if(bbox_smoke):   
                      average_bounding_box_smoke = my_utils.bb_average.calculate_average_bbox(list_of_coordinates_of_cropped_detections_smoke)
-                     print("\nNumber of smoke detections: ", len(list_of_coordinates_of_cropped_detections_smoke))
                      average_smoke_detection = my_utils.bb_average.draw_average_bbox(average_bounding_box_smoke, ready_for_opt_flow[-1][0], "smoke")
                      
                      

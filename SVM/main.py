@@ -50,16 +50,15 @@ def Train_and_Load_Model():
    print("\nInitialising SVM model...")
    model = svm.SVC()
 
-   print("\nTraining SVM model...")
+   print("Training SVM model...")
    x_train = np.array(x_train)
    model.fit(x_train.reshape(x_train.shape[0], 800), y_train)
    
-   print("\n-----")
    # Print achieved accuracy
    y_pred = model.predict(np.array(x_test).reshape(np.array(x_test).shape[0], 800))
-   print('\nAchieved accuracy with current flowdataset: %.3f' % accuracy_score(y_test, y_pred))
-   print('\nAchieved precision with current flowdataset: %.3f' % average_precision_score(y_test, y_pred))
-   print("\n-----")
+   print('Achieved accuracy with current flowdataset: %.3f' % accuracy_score(y_test, y_pred))
+   print('Achieved precision with current flowdataset: %.3f' % average_precision_score(y_test, y_pred))
+   print("\n----------------------")
 
    return model, accuracy_score(y_test, y_pred), average_precision_score(y_test, y_pred)
 
