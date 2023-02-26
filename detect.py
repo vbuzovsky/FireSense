@@ -22,7 +22,8 @@ import my_utils.bb_average
 import my_utils.snapshot_clear
 import my_utils.subsample_flow
 import my_utils.file_manager
-import SVM.main
+import Classifiers.svm as SVM
+import Classifiers.keras_nn as NN
 import queue
 
 
@@ -42,7 +43,10 @@ def detect(save_img=False):
     half = device.type != 'cpu'  # half precision only supported on CUDA
 
     # Init SVM model
-    SVM_model, SVM_accuracy, SVM_precision = SVM.main.Train_and_Load_Model()
+    SVM_model, SVM_accuracy, SVM_precision = SVM.Train_and_Load_Model()
+
+    # Init NN model
+    # NN.Train_and_Load_Model()
 
     # Initialize image buffer
     BUFFER_SIZE = 10
@@ -266,7 +270,7 @@ def detect(save_img=False):
                      fire_subsampled_flow = my_utils.subsample_flow.subsample(fire_optical_flow)
                      my_utils.optical_flow.save_optical_flow(fire_optical_flow, average_fire_detection, "flow" , "fire")
                      # my_utils.file_manager.save_optical_flow(fire_subsampled_flow, f"./output_flow/fire/fire_{source[-9:-4]}_{OPT_FLOW_COUNTER}")
-                     SVM_prediction = SVM.main.pred(SVM_model, fire_subsampled_flow)
+                     SVM_prediction = SVM.pred(SVM_model, fire_subsampled_flow)
                      print("SVM classifier prediction for fire:", bool(int(SVM_prediction)), "-- (with {:.1f}% accuracy)".format(float(SVM_accuracy) * 100))
                      print("Average YOLOv7 confidence for fire: %.2f" % float(sum(list_of_fire_confidence)/len(list_of_fire_confidence)))
 
@@ -286,7 +290,7 @@ def detect(save_img=False):
                      smoke_subsampled_flow = my_utils.subsample_flow.subsample(smoke_optical_flow)
                      my_utils.optical_flow.save_optical_flow(smoke_optical_flow, average_smoke_detection, "flow" , "smoke")
                      # my_utils.file_manager.save_optical_flow(smoke_subsampled_flow, f"./output_flow/smoke/smoke_{source[-9:-4]}_{OPT_FLOW_COUNTER}")
-                     SVM_prediction = SVM.main.pred(SVM_model, smoke_subsampled_flow)
+                     SVM_prediction = SVM.pred(SVM_model, smoke_subsampled_flow)
                      print("SVM classifier prediction for smoke:", bool(int(SVM_prediction)), "-- (with {:.1f}% accuracy)".format(float(SVM_accuracy) * 100))
                      print("Average YOLOv7 confidence for smoke: %.2f" % float(sum(list_of_smoke_confidence)/len(list_of_smoke_confidence)))
                      # my_utils.optical_flow.draw_optical_flow(smoke_optical_flow, cropped_frames_for_opt_flow[-1][0], param='flow')
