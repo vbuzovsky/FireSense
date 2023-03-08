@@ -22,12 +22,23 @@ import my_utils.bb_average
 import my_utils.snapshot_clear
 import my_utils.subsample_flow
 import my_utils.file_manager
-import SVM.main
+import Classifiers.svm as SVM
+import tensorflow as tf
+import tensorflow.keras as keras
 import queue
+
+# -- ignore stoopid tensorflow warnings on m1 chips --
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+# 0 = all messages are logged (default behavior)s
+# 1 = INFO messages are not printed
+# 2 = INFO and WARNING messages are not printed
+# 3 = INFO, WARNING, and ERROR messages are not printed
+
 
 
 def detect(save_img=False):
-    source, weights, view_img, save_txt, imgsz, trace = opt.source, opt.weights, opt.view_img, opt.save_txt, opt.img_size, not opt.no_trace
+    source, weights, view_img, save_txt, imgsz, trace, dump_flows, use_svm, use_nn, draw_opt_flow = opt.source, opt.weights, opt.view_img, opt.save_txt, opt.img_size, not opt.no_trace, opt.dump_flows, opt.use_svm, opt.use_nn, opt.draw_flow
     save_img = not opt.nosave and not source.endswith('.txt')  # save inference images
     webcam = source.isnumeric() or source.endswith('.txt') or source.lower().startswith(
         ('rtsp://', 'rtmp://', 'http://', 'https://'))
@@ -42,7 +53,14 @@ def detect(save_img=False):
     half = device.type != 'cpu'  # half precision only supported on CUDA
 
     # Init SVM model
-    SVM_model, SVM_accuracy, SVM_precision = SVM.main.Train_and_Load_Model()
+    if(use_svm):
+      SVM_fire_model, SVM_fire_accuracy, SVM_precision = SVM.Train_and_Load_Model("fire")
+      SVM_smoke_model, SVM_smoke_accuracy, SVM_precision = SVM.Train_and_Load_Model("smoke")
+
+    # load NN model
+    if(use_nn):
+      NN_fire_model = keras.models.load_model("NN_fire_classificator.h5")
+      NN_smoke_model = keras.models.load_model("NN_smoke_classificator.h5")
 
     # Initialize image buffer
     BUFFER_SIZE = 10
@@ -153,11 +171,6 @@ def detect(save_img=False):
             if(i==0):
                 IMG_BUFFER.put([im0, det, len(det)]) # len(det) gives information about how many detection there are, det passed for checking detection class (smoke or fire)
 
-            # det looks like: (2 detections)
-            # tensor([[4.43483e+02, 1.15858e+02, 4.71866e+02, 1.29325e+02, 5.64296e-01, 1.00000e+00],
-            # [1.63590e+02, 1.66809e+01, 5.55311e+02, 3.16970e+02, 5.19833e-01, 0.00000e+00]])
-
-
             if len(det): # if there is any detection
                # Rescale boxes from img_size to im0 size
                det[:, :4] = scale_coords(img.shape[2:], det[:, :4], im0.shape).round()
@@ -245,13 +258,16 @@ def detect(save_img=False):
                   print("Number of detection in buffer: ", len(list_of_cropped_detections))
                   print("Number of smoke detections: ", len(bbox_smoke))
                   print("Number of fire detections: ", len(bbox_fire))
+                  print("\n")
                   list_of_cropped_detections = [] # reset list of cropped detections
 
+                  # calc full optical flow:
                   # optical_flow = my_utils.optical_flow.calculate_optical_flow(ready_for_opt_flow) # add 'hsv' as second param for hsv
+                  
                   # counter only needed when saving flows for creating flow dataset
-                  # OPT_FLOW_COUNTER = OPT_FLOW_COUNTER + 1
+                  if(dump_flows):
+                     OPT_FLOW_COUNTER = OPT_FLOW_COUNTER + 1
 
-               
                   if(bbox_fire):
                      average_bounding_box_fire = my_utils.bb_average.calculate_average_bbox(list_of_coordinates_of_cropped_detections_fire)
                      average_fire_detection = my_utils.bb_average.draw_average_bbox(average_bounding_box_fire, ready_for_opt_flow[-1][0], "fire")
@@ -260,17 +276,25 @@ def detect(save_img=False):
                      for frame in ready_for_opt_flow:
                         cropped_frames_for_opt_flow.append([frame[0][average_bounding_box_fire[0]:average_bounding_box_fire[1], average_bounding_box_fire[2]:average_bounding_box_fire[3], :], frame[1], frame[2]])
                      fire_optical_flow = my_utils.optical_flow.calculate_optical_flow(cropped_frames_for_opt_flow)
-
-                     #fire_optical_flow = optical_flow[average_bounding_box_fire[0]:average_bounding_box_fire[1], average_bounding_box_fire[2]:average_bounding_box_fire[3], :]
                      fire_subsampled_flow = my_utils.subsample_flow.subsample(fire_optical_flow)
                      my_utils.optical_flow.save_optical_flow(fire_optical_flow, average_fire_detection, "flow" , "fire")
-                     # my_utils.file_manager.save_optical_flow(fire_subsampled_flow, f"./output_flow/fire/fire_{source[-9:-4]}_{OPT_FLOW_COUNTER}")
-                     SVM_prediction = SVM.main.pred(SVM_model, fire_subsampled_flow)
-                     print("SVM classifier prediction for fire:", bool(int(SVM_prediction)), "-- (with {:.1f}% accuracy)".format(float(SVM_accuracy) * 100))
-                     print("Average YOLOv7 confidence for fire: %.2f" % float(sum(list_of_fire_confidence)/len(list_of_fire_confidence)))
 
+                     if(dump_flows):
+                        my_utils.file_manager.save_optical_flow(fire_subsampled_flow, f"./output_flow/fire/fire_{source[-9:-4]}_{OPT_FLOW_COUNTER}")
+                     else:
+                        print("Average YOLOv7 confidence for fire: %.2f" % float(sum(list_of_fire_confidence)/len(list_of_fire_confidence)))
+                        
+                        if(use_svm):
+                           SVM_prediction = SVM.pred(SVM_fire_model, fire_subsampled_flow)
+                           print("SVM classifier prediction for fire:", bool(int(SVM_prediction)), "-- (with {:.1f}% accuracy)".format(float(SVM_fire_accuracy) * 100))
+                        if(use_nn):
+                           prediction = NN_fire_model.predict(tf.reshape(fire_subsampled_flow, (1, 20, 20, 2)), verbose=0)
+                           print("NN classificator prediction for fire: %.2f" % float(prediction[0] * 100), "%")
+                        if(draw_opt_flow):
+                           my_utils.optical_flow.draw_optical_flow(fire_optical_flow, cropped_frames_for_opt_flow[-1][0], param='flow')
 
-                  if(bbox_smoke):   
+                  if(bbox_smoke):
+                     print("-----------------------")   
                      average_bounding_box_smoke = my_utils.bb_average.calculate_average_bbox(list_of_coordinates_of_cropped_detections_smoke)
                      average_smoke_detection = my_utils.bb_average.draw_average_bbox(average_bounding_box_smoke, ready_for_opt_flow[-1][0], "smoke")
                      
@@ -278,15 +302,22 @@ def detect(save_img=False):
                      for frame in ready_for_opt_flow:
                         cropped_frames_for_opt_flow.append([frame[0][average_bounding_box_smoke[0]:average_bounding_box_smoke[1], average_bounding_box_smoke[2]:average_bounding_box_smoke[3], :], frame[1], frame[2]])
                      smoke_optical_flow = my_utils.optical_flow.calculate_optical_flow(cropped_frames_for_opt_flow)
-
-                     #smoke_optical_flow = optical_flow[average_bounding_box_smoke[0]:average_bounding_box_smoke[1], average_bounding_box_smoke[2]:average_bounding_box_smoke[3], :]
                      smoke_subsampled_flow = my_utils.subsample_flow.subsample(smoke_optical_flow)
                      my_utils.optical_flow.save_optical_flow(smoke_optical_flow, average_smoke_detection, "flow" , "smoke")
-                     # my_utils.file_manager.save_optical_flow(smoke_subsampled_flow, f"./output_flow/smoke/smoke_{source[-9:-4]}_{OPT_FLOW_COUNTER}")
-                     SVM_prediction = SVM.main.pred(SVM_model, smoke_subsampled_flow)
-                     print("SVM classifier prediction for smoke:", bool(int(SVM_prediction)), "-- (with {:.1f}% accuracy)".format(float(SVM_accuracy) * 100))
-                     print("Average YOLOv7 confidence for smoke: %.2f" % float(sum(list_of_smoke_confidence)/len(list_of_smoke_confidence)))
-                     # my_utils.optical_flow.draw_optical_flow(smoke_optical_flow, cropped_frames_for_opt_flow[-1][0], param='flow')
+                     
+                     if(dump_flows):
+                        my_utils.file_manager.save_optical_flow(smoke_subsampled_flow, f"./output_flow/smoke/smoke_{source[-9:-4]}_{OPT_FLOW_COUNTER}")
+                     else:
+                        print("Average YOLOv7 confidence for smoke: %.2f" % float(sum(list_of_smoke_confidence)/len(list_of_smoke_confidence)))
+                        
+                        if(use_svm):
+                           SVM_prediction = SVM.pred(SVM_smoke_model, smoke_subsampled_flow)
+                           print("SVM classifier prediction for smoke:", bool(int(SVM_prediction)), "-- (with {:.1f}% accuracy)".format(float(SVM_smoke_accuracy) * 100))
+                        if(use_nn):   
+                           prediction = NN_smoke_model.predict(tf.reshape(smoke_subsampled_flow, (1, 20, 20, 2)), verbose=0)
+                           print("NN classificator prediction for smoke: %.2f" % float(prediction[0] * 100), "%")
+                        if(draw_opt_flow):
+                           my_utils.optical_flow.draw_optical_flow(smoke_optical_flow, cropped_frames_for_opt_flow[-1][0], param='flow')
                   
                   print("--------- END BUFFER OUTPUT ---------")
                   
@@ -298,10 +329,7 @@ def detect(save_img=False):
                   # print("ready for opt flow shape: ", ready_for_opt_flow[-1][0].shape)
                   # -------------------------------------
 
-                  
-                  
-
-
+            
             print("buffer size: ",IMG_BUFFER.qsize())
 
             # Pop last frame from buffer when overflowing - also check for detection in that frame and pop it from list of detections
@@ -366,6 +394,11 @@ if __name__ == '__main__':
     parser.add_argument('--name', default='exp', help='save results to project/name')
     parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
     parser.add_argument('--no-trace', action='store_true', help='don`t trace model')
+    parser.add_argument('--dump-flows', action='store_true', help='output flows for training classifiers')
+    parser.add_argument('--use-svm', action='store_true', help='use SVM classifier')
+    parser.add_argument('--use-nn', action='store_true', help='use NN classifier')
+    parser.add_argument('--draw-flow', action='store_true', help='draw optical flow')
+
     opt = parser.parse_args()
     print(opt)
     #check_requirements(exclude=('pycocotools', 'thop'))
