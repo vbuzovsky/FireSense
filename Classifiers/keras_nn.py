@@ -7,12 +7,11 @@ import tensorflow.keras as keras
 from tensorflow.keras import layers
 
 
-def Train_and_Load_Model():
-   raw_data, raw_labels = load_flow_dataset()
-   data, labels = shuffle_dataset(raw_data, raw_labels)
+def Train_and_Load_Model(cls, epochs):
+   raw_data, raw_labels = load_flow_dataset(cls)
+   #data, labels = shuffle_dataset(raw_data, raw_labels)
    
-   x_train, x_test, y_train, y_test = train_test_split(data, labels, test_size=0.2)
-   x_train_partial, x_val, y_train_partial, y_val = train_test_split(x_train, y_train, test_size=0.2)
+   x_train, x_val, y_train, y_val = train_test_split(raw_data, raw_labels, test_size=0.2)
 
    model = keras.Sequential([
       layers.Dense(800, activation="relu", name="layer1"),
@@ -23,13 +22,22 @@ def Train_and_Load_Model():
       layers.Dense(1, activation="sigmoid", name="layer5")
    ])
 
-   model.compile(optimizer="rmsprop", loss="binary_crossentropy", metrics=["accuracy"])
+   opt = keras.optimizers.RMSprop(learning_rate=0.0001)
+   model.compile(optimizer=opt, loss="binary_crossentropy", metrics=["accuracy"])
 
 
-   y_train_partial = tf.one_hot(y_train_partial, depth=1)
+   y_train = tf.one_hot(y_train, depth=1)
    y_val = tf.one_hot(y_val, depth=1)
    
-   history = model.fit(np.array(x_train_partial), y_train_partial, epochs=6, batch_size=32, validation_data=(np.array(x_val), y_val))
+   callbacks = [
+      keras.callbacks.EarlyStopping(
+         monitor="val_loss",
+         restore_best_weights=True,
+         patience=10,
+      )
+   ]
+
+   history = model.fit(np.array(x_train), y_train, epochs=epochs, batch_size=16, validation_data=(np.array(x_val), y_val) , callbacks=callbacks)
 
    history_dict = history.history
    loss_values = history_dict["loss"]
@@ -43,6 +51,7 @@ def Train_and_Load_Model():
    plt.legend()
    plt.show()
    
+   model.save(f"NN_{cls}2_classificator.h5")
 
 
 

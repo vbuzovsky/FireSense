@@ -2,6 +2,7 @@ import numpy as np
 import os
 
 
+
 def _load_optical_flow(path):
     flow = np.load(path, allow_pickle=True, fix_imports=True)
     return flow
@@ -13,22 +14,47 @@ def _save_optical_flow(flow, path):
    except:
       return False
 
+# OLD BOTH CLASSES DATASET LOADER
+# def load_flow_dataset():
+#    rootdir = './data/NEW_FLOW'
+#    data = []
+#    labels = []
 
-def load_flow_dataset():
-   rootdir = './data/FlowDataset'
+#    for subdir, dirs, files in os.walk(rootdir):
+#       for file in files:
+#          if(not file.__contains__(".DS_Store")): # Ignore .DS_Store files in MacOS      
+#             data.append(_load_optical_flow(os.path.join(subdir, file)))
+
+#             label = subdir.split('/')[-1]
+#             if(label.__contains__("negative")):
+#                labels.append(0)
+#             else:
+#                labels.append(1)
+
+#    return data, labels
+
+def load_flow_dataset(cls):
+   rootdir = './data/FINAL_DATASET'
    data = []
    labels = []
 
    for subdir, dirs, files in os.walk(rootdir):
       for file in files:
          if(not file.__contains__(".DS_Store")): # Ignore .DS_Store files in MacOS      
-            data.append(_load_optical_flow(os.path.join(subdir, file)))
-
+            
             label = subdir.split('/')[-1]
-            if(label.__contains__("negative")):
-               labels.append(0)
-            else:
-               labels.append(1)
+            if(label.__contains__("fire") and cls == "fire"):
+               data.append(_load_optical_flow(os.path.join(subdir, file)))
+               if(label.__contains__("negative")):
+                  labels.append(0)
+               else:
+                  labels.append(1)
+            elif(label.__contains__("smoke") and cls == "smoke"):
+               data.append(_load_optical_flow(os.path.join(subdir, file)))
+               if(label.__contains__("negative")):
+                  labels.append(0)
+               else:
+                  labels.append(1)
 
    return data, labels
 
