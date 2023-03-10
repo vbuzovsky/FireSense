@@ -54,8 +54,8 @@ def detect(save_img=False):
 
     # Init SVM model
     if(use_svm):
-      SVM_fire_model, SVM_fire_accuracy, SVM_precision = SVM.Train_and_Load_Model("fire")
-      SVM_smoke_model, SVM_smoke_accuracy, SVM_precision = SVM.Train_and_Load_Model("smoke")
+     SVM_fire_model, SVM_fire_accuracy, SVM_precision = SVM.Train_and_Load_Model("fire")
+     SVM_smoke_model, SVM_smoke_accuracy, SVM_precision = SVM.Train_and_Load_Model("smoke")
 
     # load NN model
     if(use_nn):
@@ -282,7 +282,10 @@ def detect(save_img=False):
                      if(dump_flows):
                         my_utils.file_manager.save_optical_flow(fire_subsampled_flow, f"./output_flow/fire/fire_{source[-9:-4]}_{OPT_FLOW_COUNTER}")
                      else:
+                        print("list:", list_of_fire_confidence)
                         print("Average YOLOv7 confidence for fire: %.2f" % float(sum(list_of_fire_confidence)/len(list_of_fire_confidence)))
+                        list_of_fire_confidence.clear()
+
                         
                         if(use_svm):
                            SVM_prediction = SVM.pred(SVM_fire_model, fire_subsampled_flow)
@@ -309,6 +312,7 @@ def detect(save_img=False):
                         my_utils.file_manager.save_optical_flow(smoke_subsampled_flow, f"./output_flow/smoke/smoke_{source[-9:-4]}_{OPT_FLOW_COUNTER}")
                      else:
                         print("Average YOLOv7 confidence for smoke: %.2f" % float(sum(list_of_smoke_confidence)/len(list_of_smoke_confidence)))
+                        list_of_smoke_confidence.clear()
                         
                         if(use_svm):
                            SVM_prediction = SVM.pred(SVM_smoke_model, smoke_subsampled_flow)
@@ -320,15 +324,7 @@ def detect(save_img=False):
                            my_utils.optical_flow.draw_optical_flow(smoke_optical_flow, cropped_frames_for_opt_flow[-1][0], param='flow')
                   
                   print("--------- END BUFFER OUTPUT ---------")
-                  
-                  # some info about optical flow and bboxes
-                  # -------------------------------------
-                  # print("average bbox shape: ", average_bounding_box_fire)
-                  # print("fire optical flow shape: ", fire_optical_flow.shape)
-                  # print("average bbox for fire shape: ", average_bounding_box_fire)
-                  # print("ready for opt flow shape: ", ready_for_opt_flow[-1][0].shape)
-                  # -------------------------------------
-
+             
             
             print("buffer size: ",IMG_BUFFER.qsize())
 
@@ -338,6 +334,10 @@ def detect(save_img=False):
                dropped_frame = IMG_BUFFER.get()
                if(dropped_frame[-1]):
                   list_of_cropped_detections.pop(0)
+                  if(len(list_of_fire_confidence) > 0):
+                     list_of_fire_confidence.pop(0)
+                  if(len(list_of_smoke_confidence) > 0):
+                     list_of_smoke_confidence.pop(0)
 
             # Print time (inference + NMS)
             print(f'{s}Done. ({(1E3 * (t2 - t1)):.1f}ms) Inference, ({(1E3 * (t3 - t2)):.1f}ms) NMS')

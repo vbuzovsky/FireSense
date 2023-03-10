@@ -58,11 +58,55 @@ def load_flow_dataset(cls):
 
    return data, labels
 
-# this is copilot code -- POSSIBLY NOT WORKING CORRECTLY
+# just checking dataset properties
+def calc_average_flow(flow):
+   x = []
+   y = []
+   for i in range(0, flow.shape[0]):
+      for j in range(0, flow.shape[1]):
+         x.append(flow[i, j, :][0])
+         y.append(flow[i, j, :][1])
+   
+   # print("x: ", np.mean(x))
+   # print("y: ", np.mean(y))
+   return [np.mean(x), np.mean(y)]
+
 def shuffle_dataset(data, labels):
    combined = list(zip(data, labels))
    np.random.shuffle(combined)
    data[:], labels[:] = zip(*combined)
 
    return data, labels
+
+
+
+
+if __name__ == '__main__':
+   raw_data, raw_labels = load_flow_dataset("fire")
+
+   average_positive = []
+   average_negative = []
+   for index, item in enumerate(raw_data):
+      if(raw_labels[index] == 1):
+         average_positive.append(calc_average_flow(item))
+      else:
+         average_negative.append(calc_average_flow(item))
+   
+   total_mean_x = []
+   total_mean_y = []
+   for average_flow in average_positive:
+      total_mean_x.append(average_flow[0])
+      total_mean_y.append(average_flow[1])
+   
+   print("positive average: [", np.mean(total_mean_x), np.mean(total_mean_y), "]")
+   
+   total_mean_x = []
+   total_mean_y = []
+
+   for average_flow in average_negative:
+      total_mean_x.append(average_flow[0])
+      total_mean_y.append(average_flow[1])
+
+   print("negative average: [", np.mean(total_mean_x), np.mean(total_mean_y), "]")
+
 
