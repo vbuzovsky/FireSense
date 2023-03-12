@@ -9,6 +9,10 @@ def subsample(flow):
 
    print("x: ", x)
    print("y: ", y)
+   if(x < 20):
+      x = 20
+   if(y < 20):
+      y = 20
 
    subsampled_rows = flow[0::math.floor(x/20)]
    for row in subsampled_rows:
