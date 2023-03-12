@@ -7,22 +7,22 @@ import tensorflow.keras as keras
 from tensorflow.keras import layers
 
 
+
 def Train_and_Load_Model(epochs):
    x, y = shuffle_dataset(*LoadDataset())
    x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.2, random_state=42)
 
-   model = keras.Sequential([
-      layers.Conv2D(32, (3, 3), activation="relu", input_shape=(200, 200, 3)),
-      layers.MaxPooling2D((2, 2)),
-      layers.Conv2D(64, (3, 3), activation="relu"),
-      layers.MaxPooling2D((2, 2)),
-      layers.Conv2D(128, (3, 3), activation="relu"),
-      layers.MaxPooling2D((2, 2)),
-      layers.Flatten(),
-      layers.Dense(64, activation="relu"),
-      layers.Dense(32, activation="relu"),
-      layers.Dense(3, activation="sigmoid")
-   ])
+   backbone = keras.applications.ResNet50V2(
+      include_top=False, weights="imagenet", input_shape=(200, 200, 3), classes=3, classifier_activation="softmax", pooling="max"
+   )
+   
+
+   model = keras.Sequential()
+   model.add(backbone)
+   model.add(layers.Dense(256, activation="relu"))
+   model.add(layers.Dense(128, activation="relu"))
+   model.add(layers.Dense(3, activation="softmax"))
+
 
    opt = keras.optimizers.RMSprop(learning_rate=0.00001)
    model.compile(optimizer=opt, loss="categorical_crossentropy", metrics=["accuracy"])
@@ -40,6 +40,7 @@ def Train_and_Load_Model(epochs):
    ]
 
    history = model.fit(np.array(x_train), y_train, epochs=epochs, batch_size=32, validation_data=(np.array(x_val), y_val) , callbacks=callbacks)
+   
 
    history_dict = history.history
    loss_values = history_dict["loss"]
@@ -51,7 +52,7 @@ def Train_and_Load_Model(epochs):
    plt.xlabel("Epochs")
    plt.ylabel("Loss")
    plt.legend()
-   plt.show()
+   plt.savefig("training.png")
    
    model.save(f"NN_classificator.h5")
 
