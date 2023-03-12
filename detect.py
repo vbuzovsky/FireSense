@@ -16,13 +16,22 @@ from utils.plots import plot_one_box
 from utils.torch_utils import select_device, load_classifier, time_synchronized, TracedModel
 
 # my imports:
-import my_utils.optical_flow
+
 import my_utils.bb_average
 import my_utils.snapshot_clear
-import my_utils.subsample_flow
-import my_utils.file_manager
+import tensorflow as tf
+import tensorflow.keras as keras
 import queue
-import matplotlib.pylab as plt
+
+# -- ignore stoopid tensorflow warnings on m1 chips --
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+# 0 = all messages are logged (default behavior)s
+# 1 = INFO messages are not printed
+# 2 = INFO and WARNING messages are not printed
+# 3 = INFO, WARNING, and ERROR messages are not printed
+
+
 
 def detect(save_img=False):
     source, weights, view_img, save_txt, imgsz, trace = opt.source, opt.weights, opt.view_img, opt.save_txt, opt.img_size, not opt.no_trace
@@ -39,6 +48,7 @@ def detect(save_img=False):
     device = select_device(opt.device)
     half = device.type != 'cpu'  # half precision only supported on CUDA
 
+
     # Initialize image buffer
     BUFFER_SIZE = 10
     IMG_BUFFER = queue.Queue(BUFFER_SIZE)
@@ -48,6 +58,8 @@ def detect(save_img=False):
     list_of_cropped_detections = [] # for storing cropped detections
     list_of_coordinates_of_cropped_detections_fire = [] # for storing coordinates of cropped detections
     list_of_coordinates_of_cropped_detections_smoke = [] # for storing coordinates of cropped detections
+    list_of_fire_confidence = [] # for storing confidence of cropped detections
+    list_of_smoke_confidence = []
 
     # Load model
     model = attempt_load(weights, map_location=device)  # load FP32 model
@@ -118,16 +130,6 @@ def detect(save_img=False):
         if classify:
             pred = apply_classifier(pred, modelc, img, im0s)
       
-        #print('\npred: ', pred)
-        # pred: (every predition is a tensor, where last value of each row is the class (0 smoke or 1 fire))
-        # 1 smoke, 1 fire, Done. (315.9ms) Inference, (0.5ms) NMS
-        # pred: [tensor([[3.44141e+02, 2.64356e+02, 3.64211e+02, 2.93777e+02, 3.55650e-01, 1.00000e+00],
-        # [3.53637e+02, 1.46549e+01, 5.19450e+02, 1.66380e+02, 2.78257e-01, 0.00000e+00]])]
-        # ----------------------------------------
-        # 2 fires, Done. (275.3ms) Inference, (0.3ms) NMS
-        # pred: [tensor([[3.40323e+02, 2.54744e+02, 3.65315e+02, 2.93886e+02, 5.20145e-01, 1.00000e+00],
-        # [3.25706e+02, 2.10080e+02, 3.69769e+02, 2.94688e+02, 3.43472e-01, 1.00000e+00]])]
-
 
         # Process detections
         for i, det in enumerate(pred):  
@@ -146,11 +148,6 @@ def detect(save_img=False):
             if(i==0):
                 IMG_BUFFER.put([im0, det, len(det)]) # len(det) gives information about how many detection there are, det passed for checking detection class (smoke or fire)
 
-            # det looks like: (2 detections)
-            # tensor([[4.43483e+02, 1.15858e+02, 4.71866e+02, 1.29325e+02, 5.64296e-01, 1.00000e+00],
-            # [1.63590e+02, 1.66809e+01, 5.55311e+02, 3.16970e+02, 5.19833e-01, 0.00000e+00]])
-
-
             if len(det): # if there is any detection
                # Rescale boxes from img_size to im0 size
                det[:, :4] = scale_coords(img.shape[2:], det[:, :4], im0.shape).round()
@@ -160,21 +157,21 @@ def detect(save_img=False):
                   n = (det[:, -1] == c).sum()  # detections per class
                   s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add to string
 
-
-               pixel_size=[]
-               bb_shapes=[]
                # Write results
                for *xyxy, conf, cls in reversed(det): # cls is the class (0 smoke or 1 fire)
                   bounding_boxes_per_image.append([int(xyxy[1]), int(xyxy[3]), int(xyxy[0]), int(xyxy[2])])
                   
-                  bounding_box = im0[int(xyxy[1]):int(xyxy[3]),int(xyxy[0]):int(xyxy[2])]
-                  shape_of_bb=bounding_box.shape
-                  bb_shapes.append(shape_of_bb)
-                  bb_areas=shape_of_bb[0]*shape_of_bb[1]                    
-                  pixel_size.append(bb_areas)
                   # xyxy[1] = y1, xyxy[3] = y2, xyxy[0] = x1, xyxy[2] = x2
                   cropped_image = im0[int(xyxy[1]):int(xyxy[3]),int(xyxy[0]):int(xyxy[2])]
                   list_of_cropped_detections.append([cropped_image, int(cls)])
+
+                  # store confidences to calculate average
+                  if(cls == 0): # smoke
+                     list_of_smoke_confidence.append(round(float(conf), 2))
+                  else: # fire
+                     list_of_fire_confidence.append(round(float(conf), 2))
+
+
                   if(int(cls)==0):
                      list_of_coordinates_of_cropped_detections_smoke.append([int(xyxy[1]), int(xyxy[3]), int(xyxy[0]), int(xyxy[2])])
                   else:
@@ -188,8 +185,7 @@ def detect(save_img=False):
 
                   if save_img or view_img:  # Add bbox to image
                      label = f'{names[int(cls)]} {conf:.2f}'
-                     # comment line below to not include bounding boxes in imgs
-                     # plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=1)
+                     #plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=1)
 
                # If there is detection on a frame && IMG_BUFFER is full && IMG_BUFFER has atleast 3 frames with detection
                # -> then take snapshot of current buffer (ready_for_opt_flow : list) and send it for flow calculation
@@ -242,6 +238,7 @@ def detect(save_img=False):
                         cv2.imwrite(f'./output/current_buffer_snapshot/{index}.jpg', IMG_BUFFER.get()[0])
                         index += 1
 
+                  print("\n\n--------- BUFFER OUTPUT ---------")
                   # Taking snapshot of current detections (-> saving frames as png's to folder)
                   for index, detection in enumerate(list_of_cropped_detections):
                      if(detection[1] == 0): # 0 is smoke
@@ -250,45 +247,42 @@ def detect(save_img=False):
                      else:
                         cv2.imwrite(f'./output/current_detection_snapshot/fire-{index}.jpg', detection[0])
                         bbox_fire.append(detection[0])
+
+                  print("Number of detection in buffer: ", len(list_of_cropped_detections))
+                  print("Number of smoke detections: ", len(bbox_smoke))
+                  print("Number of fire detections: ", len(bbox_fire))
+                  print("\n")
                   list_of_cropped_detections = [] # reset list of cropped detections
 
-                  #optical_flow = my_utils.optical_flow.calculate_optical_flow(ready_for_opt_flow) # add 'hsv' as second param for hsv
-                  OPT_FLOW_COUNTER = OPT_FLOW_COUNTER + 1
 
                   if(bbox_fire):
                      print(list_of_coordinates_of_cropped_detections_fire)
                      average_bounding_box_fire = my_utils.bb_average.calculate_average_bbox(list_of_coordinates_of_cropped_detections_fire)
                      average_fire_detection = my_utils.bb_average.draw_average_bbox(average_bounding_box_fire, ready_for_opt_flow[-1][0], "fire")
                      list_of_coordinates_of_cropped_detections_fire.clear()
-                     
-                     if("pos" in source and (OPT_FLOW_COUNTER % 3 == 0)):
-                        resized = cv2.resize(average_fire_detection, (200, 200))
-                        cv2.imwrite(f'./output_resized/fire/fire_{source[-9:-4]}_{OPT_FLOW_COUNTER}.jpg', resized)
-                  if(bbox_smoke):   
+                     print("Average YOLOv7 confidence for fire: %.2f" % float(sum(list_of_fire_confidence)/len(list_of_fire_confidence)))
+                     list_of_fire_confidence.clear()
+
+                     resized = cv2.resize(average_fire_detection, (200, 200))
+                     cv2.imwrite(f'./output/current_buffer_resized/fire.jpg', resized)
+
+                        
+                  if(bbox_smoke):
                      print("-----------------------")   
                      average_bounding_box_smoke = my_utils.bb_average.calculate_average_bbox(list_of_coordinates_of_cropped_detections_smoke)
                      average_smoke_detection = my_utils.bb_average.draw_average_bbox(average_bounding_box_smoke, ready_for_opt_flow[-1][0], "smoke")
                      list_of_coordinates_of_cropped_detections_smoke.clear()
 
-                     if("pos" in source and (OPT_FLOW_COUNTER % 3 == 0)):
-                        resized = cv2.resize(average_smoke_detection, (200, 200))
-                        cv2.imwrite(f'./output_resized/smoke/smoke_{source[-9:-4]}_{OPT_FLOW_COUNTER}.jpg', resized)
-                  
-                     
-                  
-                  
-                  # some info about optical flow and bboxes
-                  # -------------------------------------
-                  # print("average bbox shape: ", average_bounding_box_fire)
-                  # print("fire optical flow shape: ", fire_optical_flow.shape)
-                  # print("average bbox for fire shape: ", average_bounding_box_fire)
-                  # print("ready for opt flow shape: ", ready_for_opt_flow[-1][0].shape)
-                  # -------------------------------------
+                     print("Average YOLOv7 confidence for smoke: %.2f" % float(sum(list_of_smoke_confidence)/len(list_of_smoke_confidence)))
+                     list_of_smoke_confidence.clear()
 
-                  # my_utils.optical_flow.draw_optical_flow(optical_flow, ready_for_opt_flow[-1][0], param='flow')
-                  
+                     resized = cv2.resize(average_smoke_detection, (200, 200))
+                     cv2.imwrite(f'./output/current_buffer_resized/smoke.jpg', resized)
 
 
+                      
+                  print("--------- END BUFFER OUTPUT ---------")
+             
             print("buffer size: ",IMG_BUFFER.qsize())
 
             # Pop last frame from buffer when overflowing - also check for detection in that frame and pop it from list of detections
@@ -297,6 +291,10 @@ def detect(save_img=False):
                dropped_frame = IMG_BUFFER.get()
                if(dropped_frame[-1]):
                   list_of_cropped_detections.pop(0)
+                  if(len(list_of_fire_confidence) > 0):
+                     list_of_fire_confidence.pop(0)
+                  if(len(list_of_smoke_confidence) > 0):
+                     list_of_smoke_confidence.pop(0)
 
             # Print time (inference + NMS)
             print(f'{s}Done. ({(1E3 * (t2 - t1)):.1f}ms) Inference, ({(1E3 * (t3 - t2)):.1f}ms) NMS')
@@ -353,6 +351,7 @@ if __name__ == '__main__':
     parser.add_argument('--name', default='exp', help='save results to project/name')
     parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
     parser.add_argument('--no-trace', action='store_true', help='don`t trace model')
+
     opt = parser.parse_args()
     print(opt)
     #check_requirements(exclude=('pycocotools', 'thop'))
