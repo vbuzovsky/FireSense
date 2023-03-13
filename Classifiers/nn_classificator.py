@@ -59,4 +59,4 @@ def Train_and_Load_Model(epochs):
 
 
 if(__name__ == "__main__"):
-   Train_and_Load_Model(20)
+   Train_and_Load_Model(50)
