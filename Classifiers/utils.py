@@ -37,6 +37,8 @@ def load_flow_dataset(cls):
    rootdir = './data/FINAL_DATASET'
    data = []
    labels = []
+   number_of_positive = 0
+   number_of_negative = 0
 
    for subdir, dirs, files in os.walk(rootdir):
       for file in files:
@@ -47,15 +49,21 @@ def load_flow_dataset(cls):
                data.append(_load_optical_flow(os.path.join(subdir, file)))
                if(label.__contains__("negative")):
                   labels.append(0)
+                  number_of_negative += 1
                else:
                   labels.append(1)
+                  number_of_positive += 1
             elif(label.__contains__("smoke") and cls == "smoke"):
                data.append(_load_optical_flow(os.path.join(subdir, file)))
                if(label.__contains__("negative")):
                   labels.append(0)
+                  number_of_negative += 1
                else:
                   labels.append(1)
+                  number_of_positive += 1
 
+   print(len(data), len(labels))
+   print(number_of_positive, number_of_negative)
    return data, labels
 
 # this is copilot code -- POSSIBLY NOT WORKING CORRECTLY

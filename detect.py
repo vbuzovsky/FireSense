@@ -38,7 +38,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 
 def detect(save_img=False):
-    source, weights, view_img, save_txt, imgsz, trace, dump_flows, use_svm, use_nn, draw_opt_flow = opt.source, opt.weights, opt.view_img, opt.save_txt, opt.img_size, not opt.no_trace, opt.dump_flows, opt.use_svm, opt.use_nn, opt.draw_flow
+    source, weights, view_img, save_txt, imgsz, trace, dump_flows, use_svm, use_nn, draw_opt_flow, buffer_size, buffer_treshold = opt.source, opt.weights, opt.view_img, opt.save_txt, opt.img_size, not opt.no_trace, opt.dump_flows, opt.use_svm, opt.use_nn, opt.draw_flow, opt.buffer_size, opt.buffer_treshold
     save_img = not opt.nosave and not source.endswith('.txt')  # save inference images
     webcam = source.isnumeric() or source.endswith('.txt') or source.lower().startswith(
         ('rtsp://', 'rtmp://', 'http://', 'https://'))
@@ -63,8 +63,7 @@ def detect(save_img=False):
       NN_smoke_model = keras.models.load_model("NN_smoke_classificator.h5")
 
     # Initialize image buffer
-    BUFFER_SIZE = 10
-    IMG_BUFFER = queue.Queue(BUFFER_SIZE)
+    IMG_BUFFER = queue.Queue(buffer_size)
     OPT_FLOW_COUNTER = 0
 
     # Cropped Detections storage
@@ -231,7 +230,7 @@ def detect(save_img=False):
 
                # Check for >= 5 detections (in case BUFFER is size of 10), then take snapshots of buffer and detections,
                # then calculate average bounding box for reach class and draw flow from whole buffer, print it to last frame
-               if(frames_with_detection >= math.floor(BUFFER_SIZE - BUFFER_SIZE/2)):
+               if(frames_with_detection >= buffer_treshold):
                   my_utils.snapshot_clear.clear_snapshot("./output/current_detection_snapshot")
                   my_utils.snapshot_clear.clear_snapshot("./output/current_buffer_average_bbox")
                   my_utils.snapshot_clear.clear_snapshot("./output/current_buffer_average_bbox_with_flow")
@@ -399,6 +398,8 @@ if __name__ == '__main__':
     parser.add_argument('--use-svm', action='store_true', help='use SVM classifier')
     parser.add_argument('--use-nn', action='store_true', help='use NN classifier')
     parser.add_argument('--draw-flow', action='store_true', help='draw optical flow')
+    parser.add_argument('--buffer-size', type=int, default=10, help='size of the buffer for optical flow')
+    parser.add_argument('--buffer-treshold', type=int, default=5, help='set treshold for buffer to start calc alg')
 
     opt = parser.parse_args()
     print(opt)

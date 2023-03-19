@@ -53,7 +53,7 @@ def calculate_optical_flow(imgs_lst : list):
         if not(i+1 == len(grayscale_imgs_lst)):
             optical_flows.append(cv2.calcOpticalFlowFarneback(grayscale_imgs_lst[i], grayscale_imgs_lst[i+1], None, 0.5, 3, 7, 3, 5, 1.2, 0))
 
-
+   
     # create deep copy of one of the flows | this gets replaced by sum of all flows, need this to have same data structure
     optical_flow_sum = copy.deepcopy(optical_flows[0])
 
