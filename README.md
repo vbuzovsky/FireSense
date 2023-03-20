@@ -19,9 +19,3 @@ Basic inference:
    $ python detect.py --source <path_to_video> --weights <path_to_weights> --conf CONFIDENCE_VALUE
 ```
 
-
-## Added main features:
- - [x] Calculating average bbox for each class
- - [x] Cutting out the bboxes from the original frame and saving them as images
- - [x] Calculating optical flow of whole IMG_BUFFER (detect.py)
- - [x] Cutting part of full optical flow to match average bbox
