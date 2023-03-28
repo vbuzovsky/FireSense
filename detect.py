@@ -189,7 +189,23 @@ def detect(save_img=False):
 
                # If there is detection on a frame && IMG_BUFFER is full && IMG_BUFFER has atleast 3 frames with detection
                # -> then take snapshot of current buffer (ready_for_opt_flow : list) and send it for flow calculation
-            
+            else:
+               if(frame % 30 == 0 and ("neg" in source)):
+                  rand_x1 = random.randint(100, im0.shape[0])
+                  rand_x2 = random.randint(100, im0.shape[0])
+                  rand_y1 = random.randint(100, im0.shape[1])
+                  rand_y2 = random.randint(100, im0.shape[1])
+
+                  while((rand_x2<rand_x1) or ((rand_x2 - rand_x1) < 50)):
+                     rand_x1 = random.randint(100, im0.shape[0])
+                     rand_x2 = random.randint(100, im0.shape[0])
+                  while((rand_y2<rand_y1) or ((rand_y2 - rand_y1) < 50)):
+                     rand_y1 = random.randint(100, im0.shape[1])
+                     rand_y2 = random.randint(100, im0.shape[1])
+               
+                  resized = cv2.resize(im0[rand_x1:rand_x2, rand_y1:rand_y2], (200, 200))
+                  cv2.imwrite(f'./output_resized/background/background_{source[-9:-4]}_{frame}_smoke.jpg', resized)
+
             if(IMG_BUFFER.full()):
                # MAYBE define detections somewhere upwards and loop through IMG_BUFFER just in case there is enough detection to save process time
                # --------------   LOOP THROUGH IMG_BUFFER, END ON SAME VALUES ----------------

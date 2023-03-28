@@ -2,9 +2,11 @@ from utils import shuffle_dataset, LoadDataset
 from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 import numpy as np
+from tensorflow import keras
 import tensorflow as tf
-import tensorflow.keras as keras
-from tensorflow.keras import layers
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.applications import MobileNetV2
+from tensorflow.keras.layers import Dense, GlobalAveragePooling2D
 
 
 
@@ -12,19 +14,23 @@ def Train_and_Load_Model(epochs):
    x, y = shuffle_dataset(*LoadDataset())
    x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.2, random_state=42)
 
-   backbone = keras.applications.ResNet50V2(
-      include_top=False, weights="imagenet", input_shape=(200, 200, 3), classes=3, classifier_activation="softmax", pooling="max"
-   )
    
+   # Load pre-trained MobileNetV2 model, without the top layer
+   base_model = MobileNetV2(input_shape=(200, 200, 3), include_top=False)
 
-   model = keras.Sequential()
-   model.add(backbone)
-   model.add(layers.Dense(256, activation="relu"))
-   model.add(layers.Dense(128, activation="relu"))
-   model.add(layers.Dense(3, activation="softmax"))
+   # Freeze the pre-trained layers
+   for layer in base_model.layers:
+      layer.trainable = False
 
+   # Add a new top layer for classification
+   model = Sequential()
+   model.add(base_model)
+   model.add(GlobalAveragePooling2D())
+   model.add(Dense(3, activation='softmax'))
 
-   opt = keras.optimizers.RMSprop(learning_rate=0.00001)
+   model.summary()
+
+   opt = keras.optimizers.RMSprop(learning_rate=0.0001)
    model.compile(optimizer=opt, loss="categorical_crossentropy", metrics=["accuracy"])
 
 
@@ -54,9 +60,9 @@ def Train_and_Load_Model(epochs):
    plt.legend()
    plt.savefig("training.png")
    
-   model.save(f"NN_classificator.h5")
+   model.save(f"NN_28_3_classificator.h5")
 
 
 
 if(__name__ == "__main__"):
-   Train_and_Load_Model(50)
+   Train_and_Load_Model(100)
