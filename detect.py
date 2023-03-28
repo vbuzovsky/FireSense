@@ -265,6 +265,7 @@ def detect(save_img=False):
 
                      resized = cv2.resize(average_fire_detection, (200, 200))
                      cv2.imwrite(f'./output/current_buffer_resized/fire.jpg', resized)
+                     cv2.imwrite(f'./output_resized/fire/fire_{source[-9:-4]}_{frame}_fire.jpg', resized)
 
                         
                   if(bbox_smoke):
@@ -278,6 +279,7 @@ def detect(save_img=False):
 
                      resized = cv2.resize(average_smoke_detection, (200, 200))
                      cv2.imwrite(f'./output/current_buffer_resized/smoke.jpg', resized)
+                     cv2.imwrite(f'./output_resized/smoke/smoke_{source[-9:-4]}_{frame}_smoke.jpg', resized)
 
 
                       
