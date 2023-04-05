@@ -14,36 +14,7 @@ def Train_and_Load_Model(epochs):
    x, y = shuffle_dataset(*LoadDataset())
    x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.2, random_state=42)
 
-   
-   # Load pre-trained MobileNetV2 model, without the top layer
-   base_model = MobileNetV2(input_shape=(200, 200, 3), include_top=False)
-
-   # Freeze the pre-trained layers
-   for layer in base_model.layers:
-      layer.trainable = False
-
-   # Add a new top layer for classification
-   model = Sequential()
-   model.add(base_model)
-   model.add(GlobalAveragePooling2D())
-   model.add(Dense(3, activation='softmax'))
-
-   model.summary()
-
-   opt = keras.optimizers.RMSprop(learning_rate=0.001)
-   model.compile(optimizer=opt, loss="categorical_crossentropy", metrics=["accuracy"])
-
-
-   y_train = tf.one_hot(y_train, depth=3)
-   y_val = tf.one_hot(y_val, depth=3)
-   
-   callbacks = [
-      keras.callbacks.EarlyStopping(
-         monitor="val_loss",
-         restore_best_weights=True,
-         patience=10,
-      )
-   ]
+   loaded_model = tf.keras.models.load_model('NN_28_3_classificator.h5')
 
    history = model.fit(np.array(x_train), y_train, epochs=epochs, batch_size=32, validation_data=(np.array(x_val), y_val) , callbacks=callbacks)
    
@@ -58,11 +29,11 @@ def Train_and_Load_Model(epochs):
    plt.xlabel("Epochs")
    plt.ylabel("Loss")
    plt.legend()
-   plt.savefig("training.png")
+   plt.savefig("continue_training.png")
    
-   model.save(f"NN_28_3_classificator.h5")
+   model.save(f"NN_28_3_classificator_continue.h5")
 
 
 
 if(__name__ == "__main__"):
-   Train_and_Load_Model(200)
+   Train_and_Load_Model(100)
