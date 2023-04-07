@@ -5,7 +5,7 @@ import numpy as np
 from tensorflow import keras
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.applications import MobileNetV2
+from tensorflow.keras.applications import VGG16
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D
 
 
@@ -16,7 +16,7 @@ def Train_and_Load_Model(epochs):
 
    
    # Load pre-trained MobileNetV2 model, without the top layer
-   base_model = MobileNetV2(input_shape=(200, 200, 3), include_top=False)
+   base_model = VGG16(input_shape=(200, 200, 3), include_top=False)
 
    # Freeze the pre-trained layers
    for layer in base_model.layers:
