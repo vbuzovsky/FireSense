@@ -5,8 +5,9 @@ import numpy as np
 from tensorflow import keras
 import tensorflow as tf
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.applications import MobileNetV2
+from tensorflow.keras.applications import VGG16
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D
+
 
 
 
@@ -14,9 +15,9 @@ def Train_and_Load_Model(epochs):
    x, y = shuffle_dataset(*LoadDataset())
    x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.2, random_state=42)
 
-   
+
    # Load pre-trained MobileNetV2 model, without the top layer
-   base_model = MobileNetV2(input_shape=(200, 200, 3), include_top=False)
+   base_model = VGG16(input_shape=(200, 200, 3), include_top=False)
 
    # Freeze the pre-trained layers
    for layer in base_model.layers:
@@ -30,9 +31,8 @@ def Train_and_Load_Model(epochs):
 
    model.summary()
 
-   opt = keras.optimizers.RMSprop(learning_rate=0.001)
+   opt = keras.optimizers.RMSprop(learning_rate=0.0005)
    model.compile(optimizer=opt, loss="categorical_crossentropy", metrics=["accuracy"])
-
 
    y_train = tf.one_hot(y_train, depth=3)
    y_val = tf.one_hot(y_val, depth=3)
@@ -58,9 +58,9 @@ def Train_and_Load_Model(epochs):
    plt.xlabel("Epochs")
    plt.ylabel("Loss")
    plt.legend()
-   plt.savefig("training.png")
+   plt.savefig("VGG16.png")
    
-   model.save(f"NN_28_3_classificator.h5")
+   model.save(f"NN_6_4_classificator.h5")
 
 
 

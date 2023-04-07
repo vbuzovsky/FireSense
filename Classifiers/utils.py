@@ -2,7 +2,7 @@ import os
 import cv2
 import numpy as np
 
-def _load_optical_flow(path):
+def _load_img(path):
     img = cv2.imread(path)
     return img
 
@@ -17,13 +17,13 @@ def LoadDataset():
             
             label = subdir.split('/')[-1]
             if(label.__contains__("fire")):
-               data.append(_load_optical_flow(os.path.join(subdir, file)))
+               data.append(_load_img(os.path.join(subdir, file)))
                labels.append(0)
             elif(label.__contains__("smoke")):
-               data.append(_load_optical_flow(os.path.join(subdir, file)))
+               data.append(_load_img(os.path.join(subdir, file)))
                labels.append(1)
             else:
-               data.append(_load_optical_flow(os.path.join(subdir, file)))
+               data.append(_load_img(os.path.join(subdir, file)))
                labels.append(2)
 
    return data, labels
