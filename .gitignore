@@ -34,7 +34,7 @@ data/images/*
 !data/images/bus.jpg
 !data/*.sh
 output/*
-
+output_resized/*
 
 results*.csv
 
