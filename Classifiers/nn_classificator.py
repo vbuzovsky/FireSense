@@ -12,7 +12,7 @@ from tensorflow.keras.layers import Dense, GlobalAveragePooling2D
 
 
 def Train_and_Load_Model(epochs):
-   x, y = shuffle_dataset(*LoadDataset())
+   x, y = shuffle_dataset(*LoadDataset(f=True,s=False))
    x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.2, random_state=42)
 
 

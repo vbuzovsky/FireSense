@@ -17,11 +17,13 @@ from utils.torch_utils import select_device, load_classifier, time_synchronized,
 
 # my imports:
 
+import numpy as np
 import my_utils.bb_average
 import my_utils.snapshot_clear
 import tensorflow as tf
 import tensorflow.keras as keras
 import queue
+
 
 # -- ignore stoopid tensorflow warnings on m1 chips --
 import os
@@ -53,6 +55,10 @@ def detect(save_img=False):
     BUFFER_SIZE = 10
     IMG_BUFFER = queue.Queue(BUFFER_SIZE)
     OPT_FLOW_COUNTER = 0
+
+    # Initialize VGG16 models
+    fire_model = keras.models.load_model('./vgg16/v2/NN_8_4_FireVGG16_Advanced.h5')
+    smoke_model = keras.models.load_model('./vgg16/v2/NN_8_4_SmokeVGG16_Advanced.h5')
 
     # Cropped Detections storage
     list_of_cropped_detections = [] # for storing cropped detections
@@ -185,7 +191,8 @@ def detect(save_img=False):
 
                   if save_img or view_img:  # Add bbox to image
                      label = f'{names[int(cls)]} {conf:.2f}'
-                     #plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=1)
+                     # comment under to mute bounding boxes
+                     plot_one_box(xyxy, im0, label=label, color=colors[int(cls)], line_thickness=1)
 
                # If there is detection on a frame && IMG_BUFFER is full && IMG_BUFFER has atleast 3 frames with detection
                # -> then take snapshot of current buffer (ready_for_opt_flow : list) and send it for flow calculation
@@ -227,7 +234,6 @@ def detect(save_img=False):
                if(frames_with_detection >= math.floor(BUFFER_SIZE - BUFFER_SIZE/2)):
                   my_utils.snapshot_clear.clear_snapshot("./output/current_detection_snapshot")
                   my_utils.snapshot_clear.clear_snapshot("./output/current_buffer_average_bbox")
-                  my_utils.snapshot_clear.clear_snapshot("./output/current_buffer_average_bbox_with_flow")
                   my_utils.snapshot_clear.clear_snapshot("./output/current_buffer_snapshot")
                   bbox_fire = []
                   bbox_smoke = []
@@ -251,11 +257,10 @@ def detect(save_img=False):
                   print("Number of detection in buffer: ", len(list_of_cropped_detections))
                   print("Number of smoke detections: ", len(bbox_smoke))
                   print("Number of fire detections: ", len(bbox_fire))
-                  print("\n")
                   list_of_cropped_detections = [] # reset list of cropped detections
 
-
                   if(bbox_fire):
+                     #print(list_of_coordinates_of_cropped_detections_fire)
                      print(list_of_coordinates_of_cropped_detections_fire)
                      average_bounding_box_fire = my_utils.bb_average.calculate_average_bbox(list_of_coordinates_of_cropped_detections_fire)
                      average_fire_detection = my_utils.bb_average.draw_average_bbox(average_bounding_box_fire, ready_for_opt_flow[-1][0], "fire")
@@ -264,6 +269,10 @@ def detect(save_img=False):
                      list_of_fire_confidence.clear()
 
                      resized = cv2.resize(average_fire_detection, (200, 200))
+                     pred = fire_model.predict(resized.reshape(1, 200, 200, 3), verbose=0)
+
+                     print("Fire prediction (from CNN): ", pred[0][0] * 100, "%")
+                  
                      cv2.imwrite(f'./output/current_buffer_resized/fire.jpg', resized)
                      cv2.imwrite(f'./output_resized/fire/fire_{source[-9:-4]}_{frame}_fire.jpg', resized)
 
@@ -278,13 +287,16 @@ def detect(save_img=False):
                      list_of_smoke_confidence.clear()
 
                      resized = cv2.resize(average_smoke_detection, (200, 200))
+                     pred = smoke_model.predict(resized.reshape(1, 200, 200, 3), verbose=0)
+                     
+                     print("Smoke prediction (from CNN): ", pred[0][0] * 100, "%")
                      cv2.imwrite(f'./output/current_buffer_resized/smoke.jpg', resized)
                      cv2.imwrite(f'./output_resized/smoke/smoke_{source[-9:-4]}_{frame}_smoke.jpg', resized)
 
 
-                      
-                  print("--------- END BUFFER OUTPUT ---------")
-             
+                  input("Press key to continue...")
+                  print("--------- END BUFFER OUTPUT ---------\n")
+            
             print("buffer size: ",IMG_BUFFER.qsize())
 
             # Pop last frame from buffer when overflowing - also check for detection in that frame and pop it from list of detections
@@ -293,6 +305,10 @@ def detect(save_img=False):
                dropped_frame = IMG_BUFFER.get()
                if(dropped_frame[-1]):
                   list_of_cropped_detections.pop(0)
+                  if(len(list_of_coordinates_of_cropped_detections_fire) > 0):
+                     list_of_coordinates_of_cropped_detections_fire.pop(0)
+                  if(len(list_of_coordinates_of_cropped_detections_smoke) > 0):
+                     list_of_coordinates_of_cropped_detections_smoke.pop(0)
                   if(len(list_of_fire_confidence) > 0):
                      list_of_fire_confidence.pop(0)
                   if(len(list_of_smoke_confidence) > 0):

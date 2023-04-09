@@ -6,7 +6,7 @@ def _load_img(path):
     img = cv2.imread(path)
     return img
 
-def LoadDataset():
+def LoadDataset(f,s):
    rootdir = './data/CNN_dataset/'
    data = []
    labels = []
@@ -17,11 +17,13 @@ def LoadDataset():
             
             label = subdir.split('/')[-1]
             if(label.__contains__("fire")):
-               data.append(_load_img(os.path.join(subdir, file)))
-               labels.append(0)
+               if(f):
+                  data.append(_load_img(os.path.join(subdir, file)))
+                  labels.append(0)
             elif(label.__contains__("smoke")):
-               data.append(_load_img(os.path.join(subdir, file)))
-               labels.append(1)
+               if(s):
+                  data.append(_load_img(os.path.join(subdir, file)))
+                  labels.append(1)
             else:
                data.append(_load_img(os.path.join(subdir, file)))
                labels.append(2)
