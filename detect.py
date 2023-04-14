@@ -299,21 +299,6 @@ def detect(save_img=False):
             
             print("buffer size: ",IMG_BUFFER.qsize())
 
-            # Pop last frame from buffer when overflowing - also check for detection in that frame and pop it from list of detections
-            # to not be part of the next average bounding box calculation after buffer is full and with >= xyz detections
-            if(IMG_BUFFER.full()):
-               dropped_frame = IMG_BUFFER.get()
-               if(dropped_frame[-1]):
-                  list_of_cropped_detections.pop(0)
-                  if(len(list_of_coordinates_of_cropped_detections_fire) > 0):
-                     list_of_coordinates_of_cropped_detections_fire.pop(0)
-                  if(len(list_of_coordinates_of_cropped_detections_smoke) > 0):
-                     list_of_coordinates_of_cropped_detections_smoke.pop(0)
-                  if(len(list_of_fire_confidence) > 0):
-                     list_of_fire_confidence.pop(0)
-                  if(len(list_of_smoke_confidence) > 0):
-                     list_of_smoke_confidence.pop(0)
-
             # Print time (inference + NMS)
             print(f'{s}Done. ({(1E3 * (t2 - t1)):.1f}ms) Inference, ({(1E3 * (t3 - t2)):.1f}ms) NMS')
 
