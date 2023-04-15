@@ -4,7 +4,7 @@ import cv2
 
 
 def RunROC(f,s, confidnce):
-   rootdir = './data/ROC-dataset/'
+   rootdir = './data/ROC-test/'
    labels = []
 
    for subdir, dirs, files in os.walk(rootdir):
@@ -17,33 +17,27 @@ def RunROC(f,s, confidnce):
                if(f):
                   labels.append(1)
                   cmd = f"python3 ./detect.py --weights best.pt --conf {confidnce} --source {os.path.join(subdir, file)}"
-                  p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-                  out, err = p.communicate()
-                  if not err:
-                     print(out)
-                  else:
-                     print(err)
+                  p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
+                  result = p.stdout.read().decode('utf-8').split("\n")
+                  print(result[2:-5])
+                  print("number of detections: ", len(result[2:-5]))
 
             elif(label.__contains__("smoke.jpg")):
                if(s):
                   labels.append(1)
                   cmd = f"python3 ./detect.py --weights best.pt --conf {confidnce} --source {os.path.join(subdir, file)}"
-                  p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-                  out, err = p.communicate()
-                  if not err:
-                     print(out)
-                  else:
-                     print(err)
+                  p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
+                  result = p.stdout.read().decode('utf-8').split("\n")
+                  print(result[2:-5])
+                  print("number of detections: ", len(result[2:-5]))
 
             else:
                labels.append(0)
                cmd = f"python3 ./detect.py --weights best.pt --conf {confidnce} --source {os.path.join(subdir, file)}"
-               p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-               out, err = p.communicate()
-               if not err:
-                  print(out)
-               else:
-                  print(err)
+               p = subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
+               result = p.stdout.read().decode('utf-8').split("\n")
+               print(result[2:-5])
+               print("number of detections: ", len(result[2:-5]))
 
    return data, labels
 

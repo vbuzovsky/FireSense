@@ -22,7 +22,7 @@ import my_utils.bb_average
 import my_utils.snapshot_clear
 import tensorflow as tf
 import tensorflow.keras as keras
-import queue
+import logging
 
 
 # -- ignore stoopid tensorflow warnings on m1 chips --
@@ -45,7 +45,7 @@ def detect(save_img=False):
     (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
 
     # Initialize
-    set_logging()
+    #set_logging()
     device = select_device(opt.device)
     half = device.type != 'cpu'  # half precision only supported on CUDA
 
@@ -222,7 +222,7 @@ if __name__ == '__main__':
     parser.add_argument('--no-trace', action='store_true', help='don`t trace model')
 
     opt = parser.parse_args()
-    print(opt)
+    #print(opt)
     #check_requirements(exclude=('pycocotools', 'thop'))
 
     with torch.no_grad():

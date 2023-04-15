@@ -312,7 +312,7 @@ if __name__ == '__main__':
     opt = parser.parse_args()
     opt.save_json |= opt.data.endswith('coco.yaml')
     opt.data = check_file(opt.data)  # check file
-    print(opt)
+    # print(opt)
     #check_requirements()
 
     if opt.task in ('train', 'val', 'test'):  # run normally
