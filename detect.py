@@ -52,6 +52,7 @@ def detect(save_img=False):
     # Initialize VGG16 models
     fire_model = keras.models.load_model('./vgg16/v2/NN_8_4_FireVGG16_Advanced.h5')
     smoke_model = keras.models.load_model('./vgg16/v2/NN_8_4_SmokeVGG16_Advanced.h5')
+    store_confidence = []
 
     # Load model
     model = attempt_load(weights, map_location=device)  # load FP32 model
@@ -149,7 +150,8 @@ def detect(save_img=False):
                # Write results
                for *xyxy, conf, cls in reversed(det): # cls is the class (0 smoke or 1 fire)
                   bounding_boxes_per_image.append([int(xyxy[1]), int(xyxy[3]), int(xyxy[0]), int(xyxy[2])])
-                  
+                  store_confidence.append(conf)
+
                   if save_txt:  # Write to file
                      xywh = (xyxy2xywh(torch.tensor(xyxy).view(1, 4)) / gn).view(-1).tolist()  # normalized xywh
                      line = (cls, *xywh, conf) if opt.save_conf else (cls, *xywh)  # label format
@@ -196,8 +198,8 @@ def detect(save_img=False):
     #print(f'Done. ({time.time() - t0:.3f}s)')
     detections = []
     for detection in det:
-        detections.append(detection[-1])
-    print(det)
+        detections.append(int(detection[-1]))
+    print(detections)
 
 
 if __name__ == '__main__':
